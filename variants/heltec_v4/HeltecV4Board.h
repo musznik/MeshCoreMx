@@ -26,6 +26,11 @@ public:
   void enterDeepSleep(uint32_t secs, int pin_wake_btn = -1);
   void powerOff() override;
   uint16_t getBattMilliVolts() override;
+  const char* getManufacturerName() const override ;
+  bool setLoRaFemLnaEnabled(bool enable) override;
+  bool canControlLoRaFemLna() const override;
+  bool isLoRaFemLnaEnabled() const override;
+
   bool setAdcMultiplier(float multiplier) override {
     if (multiplier == 0.0f) {
       adc_mult = ADC_MULTIPLIER;
@@ -35,5 +40,4 @@ public:
     return true;
   }
   float getAdcMultiplier() const override { return adc_mult; }
-  const char* getManufacturerName() const override;
 };
