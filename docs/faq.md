@@ -23,23 +23,21 @@ A list of frequently-asked questions and answers for MeshCore
     - [3.3. Q: What is the password to administer a repeater or a room server?](#33-q-what-is-the-password-to-administer-a-repeater-or-a-room-server)
     - [3.4. Q: What is the password to join a room server?](#34-q-what-is-the-password-to-join-a-room-server)
     - [3.5. Q: Can I retrieve a repeater's private key or set a repeater's private key?](#35-q-can-i-retrieve-a-repeaters-private-key-or-set-a-repeaters-private-key)
-    - [3.6. Q: The first byte of my repeater's public key collides with an existing repeater on the mesh.  How do I get a new private key with a matching public key that has its first byte of my choosing?](#36-q-the-first-byte-of-my-repeaters-public-key-collides-with-an-existing-repeater-on-the-mesh--how-do-i-get-a-new-private-key-with-a-matching-public-key-that-has-its-first-byte-of-my-choosing)
-    - [3.7. Q: My repeater may be suffering from deafness due to high power interference near my mesh's frequency, it is not hearing other in-range MeshCore radios.  What can I do?](#37-q-my-repeater-may-be-suffering-from-deafness-due-to-high-power-interference-near-my-meshs-frequency-it-is-not-hearing-other-in-range-meshcore-radios--what-can-i-do)
+    - [3.6. Q: The first byte of my repeater's public key collides with an exisitng repeater on the mesh.  How do I get a new private key with a matching public key that has its first byte of my choosing?](#36-q-the-first-byte-of-my-repeaters-public-key-collides-with-an-exisitng-repeater-on-the-mesh--how-do-i-get-a-new-private-key-with-a-matching-public-key-that-has-its-first-byte-of-my-choosing)
+    - [3.7. Q: My repeater maybe suffering from deafness due to high power interference near my mesh's frequency, it is not hearing other in-range MeshCore radios.  What can I do?](#37-q-my-repeater-maybe-suffering-from-deafness-due-to-high-power-interference-near-my-meshs-frequency-it-is-not-hearing-other-in-range-meshcore-radios--what-can-i-do)
     - [3.8. Q: How do I make my repeater an observer on the mesh?](#38-q-how-do-i-make-my-repeater-an-observer-on-the-mesh)
     - [3.9. Q: What is multi-byte support?  What do 1-byte, 2-byte, 3-byte adverts and messages mean?](#39-q-what-is-multi-byte-support--what-do-1-byte-2-byte-3-byte-adverts-and-messages-mean)
     - [3.9.1. Q: **What path hash sizes will my repeater forward?**](#391-q-what-path-hash-sizes-will-my-repeater-forward)
     - [3.9.2. Q: **What determines a packet's path hash size?**](#392-q-what-determines-a-packets-path-hash-size)
     - [3.9.3. Q: **How do I change my companion's path hash size?**](#393-q-how-do-i-change-my-companions-path-hash-size)
-    - [3.9.4. Q: **What does the CLI command `path.hash.mode` do on a repeater?**](#394-q-what-does-the-cli-command-pathhashmode-do-on-a-repeater)
-    - [3.9.5. Q: **Why use 2- or 3-byte path hash for adverts?**](#395-q-why-use-2--or-3-byte-path-hash-for-adverts)
-    - [3.9.6. Q: **When can we move away from 1-byte path hash for channel and direct messages?**](#396-q-when-can-we-move-away-from-1-byte-path-hash-for-channel-and-direct-messages)
+    - [3.9.4. Q: **What does `path.hash.mode` on a repeater do?**](#394-q-what-does-pathhashmode-on-a-repeater-do)
   - [4. T-Deck Related](#4-t-deck-related)
     - [4.1. Q: Is there a user guide for T-Deck, T-Pager, T-Watch, or T-Display Pro?](#41-q-is-there-a-user-guide-for-t-deck-t-pager-t-watch-or-t-display-pro)
     - [4.2. Q: What are the steps to get a T-Deck into DFU (Device Firmware Update) mode?](#42-q-what-are-the-steps-to-get-a-t-deck-into-dfu-device-firmware-update-mode)
     - [4.3. Q: Why is my T-Deck Plus not getting any satellite lock?](#43-q-why-is-my-t-deck-plus-not-getting-any-satellite-lock)
     - [4.4. Q: Why is my OG (non-Plus) T-Deck not getting any satellite lock?](#44-q-why-is-my-og-non-plus-t-deck-not-getting-any-satellite-lock)
     - [4.5. Q: What size of SD card does the T-Deck support?](#45-q-what-size-of-sd-card-does-the-t-deck-support)
-    - [4.6. Q: What is the public key for the default public channel?](#46-q-what-is-the-public-key-for-the-default-public-channel)
+    - [4.6. Q: what is the public key for the default public channel?](#46-q-what-is-the-public-key-for-the-default-public-channel)
     - [4.7. Q: How do I get maps on T-Deck?](#47-q-how-do-i-get-maps-on-t-deck)
     - [4.8. Q: Where do the map tiles go?](#48-q-where-do-the-map-tiles-go)
     - [4.9. Q: How to unlock deeper map zoom and server management features on T-Deck?](#49-q-how-to-unlock-deeper-map-zoom-and-server-management-features-on-t-deck)
@@ -52,9 +50,9 @@ A list of frequently-asked questions and answers for MeshCore
     - [5.1. Q: What are BW, SF, and CR?](#51-q-what-are-bw-sf-and-cr)
     - [5.2. Q: Do MeshCore clients repeat?](#52-q-do-meshcore-clients-repeat)
     - [5.3. Q: What happens when a node learns a route via a mobile repeater, and that repeater is gone?](#53-q-what-happens-when-a-node-learns-a-route-via-a-mobile-repeater-and-that-repeater-is-gone)
-    - [5.4. Q: How does a node discover a path to its destination and then use it to send messages in the future, instead of flooding every message it sends like Meshtastic?](#54-q-how-does-a-node-discover-a-path-to-its-destination-and-then-use-it-to-send-messages-in-the-future-instead-of-flooding-every-message-it-sends-like-meshtastic)
+    - [5.4. Q: How does a node discovery a path to its destination and then use it to send messages in the future, instead of flooding every message it sends like Meshtastic?](#54-q-how-does-a-node-discovery-a-path-to-its-destination-and-then-use-it-to-send-messages-in-the-future-instead-of-flooding-every-message-it-sends-like-meshtastic)
     - [5.5. Q: Do public channels always flood? Do private channels always flood?](#55-q-do-public-channels-always-flood-do-private-channels-always-flood)
-    - [5.6. Q: What is the public key for the default public channel?](#56-q-what-is-the-public-key-for-the-default-public-channel)
+    - [5.6. Q: what is the public key for the default public channel?](#56-q-what-is-the-public-key-for-the-default-public-channel)
     - [5.7. Q: Is MeshCore open source?](#57-q-is-meshcore-open-source)
     - [5.8. Q: How can I support MeshCore?](#58-q-how-can-i-support-meshcore)
     - [5.9. Q: How do I build MeshCore firmware from source?](#59-q-how-do-i-build-meshcore-firmware-from-source)
@@ -62,7 +60,7 @@ A list of frequently-asked questions and answers for MeshCore
     - [5.11. Q: Does MeshCore support ATAK](#511-q-does-meshcore-support-atak)
     - [5.12. Q: How do I add a node to the MeshCore Map](#512-q-how-do-i-add-a-node-to-the-meshcore-map)
     - [5.13. Q: Can I use a Raspberry Pi to update a MeshCore radio?](#513-q-can-i-use-a-raspberry-pi-to-update-a-meshcore-radio)
-    - [5.14. Q: Are there projects built around MeshCore?](#514-q-are-there-projects-built-around-meshcore)
+    - [5.14. Q: Are there are projects built around MeshCore?](#514-q-are-there-are-projects-built-around-meshcore)
     - [5.15. Q: Are there client applications for Windows or Mac?](#515-q-are-there-client-applications-for-windows-or-mac)
     - [5.16. Q: Are there any resources that compare MeshCore to other LoRa systems?](#516-q-are-there-any-resources-that-compare-meshcore-to-other-lora-systems)
   - [6. Troubleshooting](#6-troubleshooting)
@@ -83,12 +81,13 @@ A list of frequently-asked questions and answers for MeshCore
     - [7.5. Q: What is the format of a contact or channel QR code?](#75-q-what-is-the-format-of-a-contact-or-channel-qr-code)
     - [7.6. Q: How do I connect to the companion via WIFI, e.g. using a heltec v3?](#76-q-how-do-i-connect-to-the-companion-via-wifi-eg-using-a-heltec-v3)
     - [7.7. Q: I have a Station G2, or a Heltec V4, or an Ikoka Stick, or a radio with a EByte E22-900M30S or a E22-900M33S module, what should their transmit power be set to?](#77-q-i-have-a-station-g2-or-a-heltec-v4-or-an-ikoka-stick-or-a-radio-with-a-ebyte-e22-900m30s-or-a-e22-900m33s-module-what-should-their-transmit-power-be-set-to)
+    - [⚠️ **WARNING: Set these values at your own risk. Incorrect power settings can permanently damage your radio hardware.**](#️-warning-set-these-values-at-your-own-risk-incorrect-power-settings-can-permanently-damage-your-radio-hardware)
 
 ## 1. Introduction
 
 ### 1.1. Q: What is MeshCore?
 
-**A:** MeshCore is a multi platform system for enabling secure text based communications utilising LoRa radio hardware. It can be used for Off-Grid Communication, Emergency Response & Disaster Recovery, Outdoor Activities, Tactical Security including law enforcement and private security and also IoT sensor networks. ([source](https://meshcore.io/))
+**A:** MeshCore is a multi platform system for enabling secure text based communications utilising LoRa radio hardware. It can be used for Off-Grid Communication, Emergency Response & Disaster Recovery, Outdoor Activities, Tactical Security including law enforcement and private security and also IoT sensor networks. ([source](https://meshcore.co.uk/))
 
 MeshCore is free and open source:
 * MeshCore is the routing and firmware etc, available on GitHub under MIT license
@@ -106,20 +105,19 @@ Anyone is able to build anything they like on top of MeshCore without paying any
 ### 1.2. Q: What do you need to start using MeshCore?
 **A:** Everything you need for MeshCore is available at:
 
-- Main Website: [https://meshcore.io](https://meshcore.io)
-- Firmware Flasher: [https://flasher.meshcore.io](https://flasher.meshcore.io)
+- Main web site: [https://meshcore.co.uk](https://meshcore.co.uk)
+- Firmware Flasher: [https://flasher.meshcore.co.uk](https://flasher.meshcore.co.uk)
 - MeshCore Firmware on GitHub: [https://github.com/meshcore-dev/MeshCore](https://github.com/meshcore-dev/MeshCore)
-- MeshCore Companion Web App: [https://app.meshcore.nz](https://app.meshcore.nz)
-- MeshCore Map: [https://map.meshcore.io](https://map.meshcore.io)
-- Andy Kirby's [MeshCore Intro Video](https://www.youtube.com/watch?v=t1qne8uJBAc)
-- Liam Cottle's [MeshCore Technical Presentation](https://www.youtube.com/watch?v=OwmkVkZQTf4)
+- MeshCore Companion App: [https://meshcore.nz](https://meshcore.nz)
+- MeshCore Map: [https://meshcore.co.uk/map.html](https://meshcore.co.uk/map.html)
+- Andy Kirby has a very useful [intro video](https://www.youtube.com/watch?v=t1qne8uJBAc) for beginners.
 
 You need LoRa hardware devices to run MeshCore firmware as clients or server (repeater and room server).
 
 #### 1.2.1. Hardware
 MeshCore is available on a variety of 433MHz, 868MHz and 915MHz LoRa devices. For example, Lilygo T-Deck, T-Pager, RAK Wireless WisBlock RAK4631 devices (e.g. 19003, 19007, 19026), Heltec V3, Xiao S3 WIO, Xiao C3, Heltec T114, Station G2, Nano G2 Ultra, Seeed Studio T1000-E. More devices are being added regularly.
 
-For an up-to-date list of supported devices, please go to https://flasher.meshcore.io
+For an up-to-date list of supported devices, please go to https://flasher.meshcore.co.uk/
 
 To use MeshCore without using a phone as the client interface, you can run MeshCore on a LiLygo's T-Deck, T-Deck Plus, T-Pager, T-Watch, or T-Display Pro. MeshCore Ultra firmware running on these devices are a complete off-grid secure communication solution.
 
@@ -131,11 +129,12 @@ Companion radios are for connecting to the Android app or web app as a messenger
 
 1. **BLE Companion**
    BLE Companion firmware runs on a supported LoRa device and connects to a smart device running the Android or iOS MeshCore client over BLE
-   <https://meshcore.io/>
+   <https://meshcore.co.uk/apps.html>
 
 2. **USB Serial Companion**
    USB Serial Companion firmware runs on a supported LoRa device and connects to a smart device or a computer over USB Serial running the MeshCore web client
-   <https://app.meshcore.nz/>
+   <https://meshcore.liamcottle.net/#/>
+   <https://client.meshcore.co.uk/tabs/devices>
 
 #### 1.2.4. Repeater
 Repeaters are used to extend the range of a MeshCore network. Repeater firmware runs on the same devices that run client firmware. A repeater's job is to forward MeshCore packets to the destination device. It does **not** forward or retransmit every packet it receives, unlike other LoRa mesh systems.
@@ -188,13 +187,13 @@ The T-Deck firmware is free to download and most features are available without 
 ### 2.3. Q: What frequencies are supported by MeshCore?
 **A:** It supports the 868MHz range in the UK/EU and the 915MHz range in New Zealand, Australia, and the USA. Countries and regions in these two frequency ranges are also supported.
 
-Use the smartphone client or the repeater setup feature on the web flasher to set your radios' RF settings by choosing the preset for your regions.
+Use the smartphone client or the repeater setup feature on there web flasher to set your radios' RF settings by choosing the preset for your regions.
 
 Recently, as of October 2025, many regions have moved to the "narrow" setting, aka using BW62.5 and a lower SF number (instead of the original SF11).  For example, USA/Canada (Recommended) preset is 910.525MHz, SF7, BW62.5, CR5.
 
 After extensive testing, many regions have switched or about to switch over to BW62.5 and SF7, 8, or 9.  Narrower bandwidth setting and lower SF setting allow MeshCore's radio signals to fit between interference in the ISM band, provide for a lower noise floor, better SNR, and faster transmissions.
 
-If you have consensus from your community in your region to update your region's preset recommendation, please post your update request on  the [#meshcore-app](https://discord.com/channels/1343693475589263471/1391681655911088241) channel on the [MeshCore Discord server ](https://meshcore.gg) to let Liam Cottle know.
+If you have consensus from your community in your region to update your region's preset recommendation, please post your update request on  the [#meshcore-app](https://discord.com/channels/1343693475589263471/1391681655911088241) channel on the [MeshCore Discord server ](https://discord.gg/cYtQNYCCRK) to let Liam Cottle know.
 
 
 
@@ -229,11 +228,11 @@ The separate `set advert.interval {minutes}` command controls the local zero-hop
 
 Repeater or room server can be administered with one of the options below:
 
-- After a repeater or room server firmware is flashed on to a LoRa device, go to <https://config.meshcore.io> and use the web user interface to connect to the LoRa device via USB serial.  From there you can set the name of the server, its frequency and other related settings, location, passwords etc.
+- After a repeater or room server firmware is flashed on to a LoRa device, go to <https://config.meshcore.dev> and use the web user interface to connect to the LoRa device via USB serial.  From there you can set the name of the server, its frequency and other related settings, location, passwords etc.
 
 ![image](https://github.com/user-attachments/assets/2a9d9894-e34d-4dbe-b57c-fc3c250a2d34)
 
-- Connect the server device using a USB cable to a computer running Chrome on https://flasher.meshcore.io, then use the `console` feature to connect to the device
+- Connect the server device using a USB cable to a computer running Chrome on https://flasher.meshcore.co.uk/, then use the `console` feature to connect to the device
 
 - Use a MeshCore smartphone clients  to remotely administer servers via LoRa.
 
@@ -272,7 +271,7 @@ You can get the latitude and longitude from Google Maps by right-clicking the lo
 
 Reboot the repeater after `set prv.key <hex>` command for the new private key to take effect.
 
-### 3.6. Q: The first byte of my repeater's public key collides with an existing repeater on the mesh.  How do I get a new private key with a matching public key that has its first byte of my choosing?
+### 3.6. Q: The first byte of my repeater's public key collides with an exisitng repeater on the mesh.  How do I get a new private key with a matching public key that has its first byte of my choosing?
 
 **A:** You can generate a new private key and specific the first byte of its public key here:  https://gessaman.com/mc-keygen/
 
@@ -281,7 +280,7 @@ Having multiple repeaters with the same first byte ID does not negatively affect
 Best practice is when you set up a new repeater, choose a public key that is not in use. If it is not possible to find a unique first byte for your repeater's public key, choose one that is unique within about 10 miles (16 km) to minimize collision with nearby repeaters.
 
 
-### 3.7. Q: My repeater may be suffering from deafness due to high power interference near my mesh's frequency, it is not hearing other in-range MeshCore radios.  What can I do?
+### 3.7. Q: My repeater maybe suffering from deafness due to high power interference near my mesh's frequency, it is not hearing other in-range MeshCore radios.  What can I do?
 
 **A:** This may be due to the SX1262 radio's auto gain control feature.  You can use this command to periodically reset its AGC.  
 
@@ -299,31 +298,31 @@ This is a very low cost operation.  AGC reset is done by simply setting `state =
 ### 3.9. Q: What is multi-byte support?  What do 1-byte, 2-byte, 3-byte adverts and messages mean?
 
 **A:**
-The original MeshCore protocol design uses the first byte of a repeater's public key to denote the repeater in a path.  And with 1 byte for each repeater in the path, MeshCore packets can travel as many as 64 hops.  
+
+**Background:**
+The orginal MeshCore protocol design uses the first byte of a repeater's public key to denote the repeater in a path.  And with 1 byte for each repeater in the path, MeshCore packets can travel as many as 64 hops.  
 
 However, with 1 byte, there are only 254 unique IDs (exclude 00 and FF which are reserved).  Many meshes group have multiple repeaters with the same first byte in their public keys. Packets continue to pass through repeaters and the mesh is not harmed in anyway.  It does make it harder for tools to analyze paths with duplicated repeater IDs.  
 
-Firmware version 1.14 and newer introduces the ability for repeaters to advert with 1-, 2-, or 3-byte adverts.  Companions can also send out channel and direct messages with 1-, 2-, or 3-byte path.  Adverts and messages sent in 1-byte path is compatible with repeater firmware older or newer than 1.14.  They will travel up to 64 hops.  2-byte adverts and messages will travel up to 32 hops.  3-byte adverts and messages will travel up to 21 hops.
+Firmware version 1.14 and newer introduces the ability for repeaters to advert with 1-, 2-, or 3-byte adverts.  Companions can also send out channel and direct messages 1-, 2-, or 3-byte path.  Adverts and messages sent in 1-byte path is compatible with repeater firmware older or newer than 1.14.  They will travel up to 64 hops.  2-byte adverts and messages will travel up to 32 hops.  3-byte adverts and messages will travel up to 21 hops.
 
 ### 3.9.1. Q: **What path hash sizes will my repeater forward?**
 
-Repeaters running firmware 1.14+ repeat packets sent with 1-, 2-, or 3-byte path hash. Repeaters on firmware older than 1.14 only repeat 1-byte path hash packets and silently drop 2- and 3-byte packets.
+Repeaters running firmware 1.14+ will repeat packets with 1-, 2-, or 3-byte path hash. Repeaters on firmware older than 1.14 will only repeat 1-byte path hash packets and will silently drop 2- and 3-byte packets.
 
 ### 3.9.2. Q: **What determines a packet's path hash size?**
 
-The original packet sender determines the path hash size. The most common original sender is a companion app. The other common original sender is a repeater, when it broadcasts its advert.
+The original sender. The most common original sender is a companion app. The other common original sender is a repeater, when it broadcasts its advert.
 
 ### 3.9.3. Q: **How do I change my companion's path hash size?**
 
-As of firmware version 1.14 and MeshCore app version 1.41.0, in the MeshCore app, you can set your companion's message path hash size in `Settings (gear icon)`, `Experimental Settings`. 
+As of firmware 1.14, you can set your companion's message path hash size in the Experimental settings section of the app. Until your regional mesh has the vast majority of the repeaters updated to 1.14+ firmware, it is recommended to keep your companion at the default 1-byte because pre-1.14 repeaters will silently drop messages with larger path hashes.
 
-Until your regional mesh has the vast majority of the repeaters updated to 1.14+ firmware, it is recommended to keep your companion at the default 1-byte because pre-1.14 repeaters will silently drop messages with larger path hashes.
+### 3.9.4. Q: **What does `path.hash.mode` on a repeater do?**
 
-### 3.9.4. Q: **What does the CLI command `path.hash.mode` do on a repeater?**
+It *only* controls the path hash size used in that repeater's own advert broadcasts. It does **not** affect which packets the repeater forwards. A 1.14+ repeater will always forward 1-, 2-, and 3-byte packets regardless of this setting.
 
-This CLI command `path.hash.mode` *only* controls the path hash size used in a repeater's own advert broadcasts. It does **NOT** affect which packets the repeater forwards. A repeater with firmware 1.14+ always forward 1-, 2-, and 3-byte packets regardless of this setting.
-
-Usage: `set path.hash.mode {0|1|2}`:
+You can set it with `set path.hash.mode {0|1|2}`:
 
 ```
 ┌────────────────┬───────────────────────┐
@@ -339,13 +338,13 @@ Usage: `set path.hash.mode {0|1|2}`:
 
 It is safe to set your 1.14+ repeaters to mode 1 or 2.
 
-### 3.9.5. Q: **Why use 2- or 3-byte path hash for adverts?**
+**Why use 2- or 3-byte path hash for adverts?**
 
-A longer path hash helps tools like the LetsMesh.net Analyzer and MeshMapper disambiguate repeaters more reliably. With only 1 byte, the chance of different repeaters having the same first byte in their public key is high, making it harder to tell them apart in mesh network analysis. Since this only affects adverts, there's no downside.  2- and 3-byte adverts don't travel as far as 1-byte adverts, but it is not important for MeshCore nodes to hear a repeater's advert that are 21 or 32 hops away.
+A longer path hash helps tools like the LetsMesh Analyzer and MeshMapper disambiguate repeaters more reliably. With only 1 byte, the chance of different repeaters have the same first byte in their public key is high, making it harder to tell them apart in network analysis. Since this only affects adverts, there's no downside.  2- and 3-byte adverts don't travel as far, but it is not important for MechCore nodes to hear a repeater's advert that is 21 or 32 hops away.
 
-### 3.9.6. Q: **When can we move away from 1-byte path hash for channel and direct messages?**
+**When can we move away from 1-byte path hash?**
 
-You should move to send 2-byte or 3-byte channel and direct messages when the vast majority of the repeaters in your regional mesh are updated to firmware version 1.14 or newer.  Setting your repeater's `path.hash.mode` to 1 (for 2-byte path hash) or 2 (for 3-byte path hash) now helps the community gauge to how many repeaters have updated to 1.14+.  Please work with your MeshCore community together to decide when to switch to 2-byte path or 3-byte path for channel and direct messages.
+You should move to send 2-byte or 3-byte channel and direct messages when the vast majority of the repeaters in your regional mesh are updated to firmware version 1.14 or newer.  Setting your repeater's `path.hash.mode` to 1 (for 2-byte path) or 2 (for 3-byte path) helps the community gauge how many repeaters have updated to 1.14+.  Please work with your MeshCore community together to decide when to switch to 2-byte path or 3-byte path for messages.
 
 
 ---
@@ -365,7 +364,7 @@ You should move to send 2-byte or 3-byte channel and direct messages when the va
 5. Hear USB connection sound
 6. Release trackball
 7. T-Deck in DFU mode now
-8. At this point you can begin flashing using <https://flasher.meshcore.io>
+8. At this point you can begin flashing using <https://flasher.meshcore.co.uk/>
 
 ### 4.3. Q: Why is my T-Deck Plus not getting any satellite lock?
 **A:** For T-Deck Plus, the GPS baud rate should be set to **38400**. Also, some T-Deck Plus devices were found to have the GPS module installed upside down, with the GPS antenna facing down instead of up. If your T-Deck Plus still doesn't get any satellite lock after setting the baud rate to 38400, you might need to open the device to check the GPS orientation.
@@ -380,7 +379,7 @@ GPS on T-Deck is always enabled.  You can skip the "GPS clock sync" and the T-De
 ### 4.5. Q: What size of SD card does the T-Deck support?
 **A:** Users have had no issues using 16GB or 32GB SD cards. Format the SD card to **FAT32**.
 
-### 4.6. Q: What is the public key for the default public channel?
+### 4.6. Q: what is the public key for the default public channel?
 **A:**
 T-Deck uses the same key the smartphone apps use but in base64
 `izOH6cXN6mrJ5e26oRXNcg==`
@@ -499,7 +498,7 @@ In MeshCore, only repeaters and room server with `set repeat on` repeat.
 
 In the case if users are moving around frequently, and the paths are breaking, they just see the phone client retries and revert to flood to attempt to re-establish a path.
 
-### 5.4. Q: How does a node discover a path to its destination and then use it to send messages in the future, instead of flooding every message it sends like Meshtastic?
+### 5.4. Q: How does a node discovery a path to its destination and then use it to send messages in the future, instead of flooding every message it sends like Meshtastic?
 
 Routes are stored in sender's contact list.  When you send a message the first time, the message first gets to your destination by flood routing. When your destination node gets the message, it will send back a delivery report to the sender with all repeaters that the original message went through. This delivery report is flood-routed back to you the sender and is a basis for future direct path. When you send the next message, the path will get embedded into the packet and be evaluated by repeaters. If the hop and address of the repeater matches, it will retransmit the message, otherwise it will not retransmit, hence minimizing utilization.
 
@@ -512,7 +511,7 @@ Routes are stored in sender's contact list.  When you send a message the first t
 [Source](https://discord.com/channels/1343693475589263471/1343693475589263474/1350023009527664672)
 
 
-### 5.6. Q: What is the public key for the default public channel?
+### 5.6. Q: what is the public key for the default public channel?
 **A:** The smartphone app key is in hex:
 ` 8b3387e9c5cdea6ac9e5edbaa115cd72`
 
@@ -526,7 +525,7 @@ The third character is the capital letter 'O', not zero `0`
 - Firmware repo: https://github.com/meshcore-dev/MeshCore
 
 ### 5.8. Q: How can I support MeshCore?
-**A:** Provide your honest feedback on GitHub and on [MeshCore Discord server](https://meshcore.gg). Spread the word of MeshCore to your friends and communities; help them get started with MeshCore. Support Scott's MeshCore development at <https://buymeacoffee.com/ripplebiz>.
+**A:** Provide your honest feedback on GitHub and on [MeshCore Discord server](https://discord.gg/BMwCtwHj5V). Spread the word of MeshCore to your friends and communities; help them get started with MeshCore. Support Scott's MeshCore development at <https://buymeacoffee.com/ripplebiz>.
 
 Support Liam Cottle's smartphone client development by unlocking the server administration wait gate with in-app purchase
 
@@ -586,7 +585,7 @@ MeshCore clients would need to reset path constantly and flood traffic across th
 This could change in the future if MeshCore develops a client firmware that repeats.
 [Source](https://discord.com/channels/826570251612323860/1330643963501351004/1354780032140054659)
 
-### 5.12. Q: How do I add a node to the [MeshCore Map](https://map.meshcore.io)
+### 5.12. Q: How do I add a node to the [MeshCore Map](https://meshcore.co.uk/map.html)
 **A:**
 
 To add a BLE Companion radio, connect to the BLE Companion radio from the MeshCore smartphone app.  In the app, tap the `3 dot` menu icon at the top right corner, then tap `Internet Map`.  Tap the `3 dot` menu icon again and choose `Add me to the Map`
@@ -603,18 +602,18 @@ Below are the instructions to flash firmware onto a supported LoRa device using 
 > Instructions for nRF devices like RAK, T1000-E, T114 are immediately after the ESP instructions
 
 For ESP-based devices (e.g. Heltec V3) you need:
-- Download firmware file from https://flasher.meshcore.io
+- Download firmware file from flasher.meshcore.co.uk
     - Go to the web site on a browser, find the section that has the firmware up need
     - Click the Download button, right click on the file you need, for example,
         - `Heltec_V3_companion_radio_ble-v1.7.1-165fb33.bin`
             - Non-merged bin keeps the existing Bluetooth pairing database
         - `Heltec_v3_companion_radio_usb-v1.7.1-165fb33-merged.bin`
             - Merged bin overwrites everything including the bootloader, existing Bluetooth pairing database, but keeps configurations.
-        - Right click on the file name and copy the link and note it for later use here is an example: `https://flasher.meshcore.io/releases/download/companion-v1.7.1/Heltec_v3_companion_radio_ble-v1.7.1-165fb33.bin`
+        - Right click on the file name and copy the link and note it for later use here is an example: `https://flasher.meshcore.dev/releases/download/companion-v1.7.1/Heltec_v3_companion_radio_ble-v1.7.1-165fb33.bin`
         - Run:
-            - `wget https://flasher.meshcore.io/releases/download/companion-v1.7.1/Heltec_v3_companion_radio_ble-v1.7.1-165fb33.bin` to download the firmware file for your device type. or the version you need  - USB, BLE, Repeater, Room Server, merged bin or non-merged bin
+            - `wget https://flasher.meshcore.dev/releases/download/companion-v1.7.1/Heltec_v3_companion_radio_ble-v1.7.1-165fb33.bin` to download the firmware file for your device type. or the version you need  - USB, BLE, Repeater, Room Server, merged bin or non-merged bin
             - If the above wget command only downloads a very small file (10K bytes instead of more than 100K byte, use this command instead:
-                - `wget --user-agent="Mozilla/5.0" --content-disposition "https://flasher.meshcore.io/releases/download/companion-v1.7.1/Heltec_v3_companion_radio_usb-v1.7.1-165fb33.bin"`
+                - `wget --user-agent="Mozilla/5.0" --content-disposition "https://flasher.meshcore.dev/releases/download/companion-v1.7.1/Heltec_v3_companion_radio_usb-v1.7.1-165fb33.bin"`
     - Confirm the `ttyXXXX` device path on your Raspberry Pi:
         - Go to `/dev` directory, run ls command to find confirm your device path
         - They are usually `/dev/ttyUSB0` for ESP devices
@@ -631,14 +630,14 @@ For ESP-based devices (e.g. Heltec V3) you need:
 **Instructions for nRF devices:**
 
 For nRF devices (e.g. RAK, Heltec T114) you need the following:
-- Download firmware file from https://flasher.meshcore.io
+- Download firmware file from flasher.meshcore.co.uk
     - Go to the web site on a browser, find the section that has the firmware up need
     - You need the ZIP version for the adafruit flash tool (below)
     - Click the Download button, right click on the ZIP file, for example:
         - `RAK_4631_companion_radio_ble-v1.7.1-165fb33.zip`
-        - Right click on the file name and copy the link and note it for later use here is an example: `https://flasher.meshcore.io/releases/download/companion-v1.7.1/RAK_4631_companion_radio_ble-v1.7.1-165fb33.zip`
+        - Right click on the file name and copy the link and note it for later use here is an example: `https://flasher.meshcore.dev/releases/download/companion-v1.7.1/RAK_4631_companion_radio_ble-v1.7.1-165fb33.zip`
         - Run:
-        - `wget https://flasher.meshcore.io/releases/download/companion-v1.7.1/RAK_4631_companion_radio_ble-v1.7.1-165fb33.zip` to download the firmware file for your device type. or the version you need  - USB, BLE, Repeater, Room Server, ZIP file only
+        - `wget https://flasher.meshcore.dev/releases/download/companion-v1.7.1/RAK_4631_companion_radio_ble-v1.7.1-165fb33.zip` to download the firmware file for your device type. or the version you need  - USB, BLE, Repeater, Room Server, ZIP file only
     - Confirm the `ttyXXXX` device path on your Raspberry Pi:
         - Go to `/dev` directory, run ls command to find confirm your device path
         - They are usually `/dev/ttyACM0` for nRF devices
@@ -658,18 +657,18 @@ From here, reference repeater and room server command line commands on MeshCore 
     - https://github.com/meshcore-dev/MeshCore/wiki/Repeater-&-Room-Server-CLI-Reference
 
 
-### 5.14. Q: Are there projects built around MeshCore?
+### 5.14. Q: Are there are projects built around MeshCore?
 
-**A:** Yes, there are many.  MeshCore's protocol is open source using the MIT license.  The MIT license and the open source protocol makes it very easy for the MeshCore community to build new firmware for radios, applications on mobile devices, map tools, and analysis tools, and integration with other projects like Home Assistant.
+**A:** Yes, there are many.  MeshCore's protocol is open source using the MIT license.  The MIT license and the open source protocol makes it very easy for the MeshCore community to build new firmware for radios, applications on mobile devices, map tools, and analysis tools, and integration with other projects like Home Asistant.
 
-As new MeshCore community projects become available on a weekly basis, we have stopped tracking them here in this FAQ.  [samuk](https://github.com/samuk) maintains a very exhaustive list of MeshCore community project at https://github.com/samuk/awesome-meshcore/blob/main/README.md.  samuk accepts PRs and merges them regularly.
+As new MeshCore community projects become available on a weekly basis, we have stopped tracking them here in this FAQ.  [samuk](https://github.com/samuk) maintains a very exhausive list of MeshCore community project at https://github.com/samuk/awesome-meshcore/blob/main/README.md.  samuk accepts PRs and merges them regularly.
 
 
 ### 5.15. Q: Are there client applications for Windows or Mac?
-**A:** Yes, the same iOS and Android client is also available for Windows and Mac.  You can find them together with the Android APK here:
+**A:** Yes, the same iOS and Android client is also available for Windows and Intel Mac (sorry, not available for ARM-based Mac yet).  You can find them together with the Android APK here:
 https://files.liamcottle.net/MeshCore
 
-Both the Windows and Mac versions of the client app are fully unlocked and are free to use.
+Both the Windows and Intel Mac versions of the client app are fully unlocked and are free to use.
 
 ### 5.16. Q: Are there any resources that compare MeshCore to other LoRa systems?
 
@@ -716,18 +715,18 @@ You can get the epoch time on <https://www.epochconverter.com/> and use it to se
     - For RAK, click the reset button **TWICE**
     - For T1000-e, quickly disconnect and reconnect the magnetic side of the cable from the device **TWICE**
     - For Heltec T114, click the reset button **TWICE** (the bottom button)
-    - For Xiao nRF52, click the reset button once.  If that doesn't work, quickly double click the reset button twice.  If that doesn't work, disconnect the board from your PC and reconnect again ([seeed studio wiki](https://wiki.seeedstudio.com/XIAO_BLE/#access-the-swd-pins-for-debugging-and-reflashing-bootloader))
+    - For Xiao nRF52, click the reset button once.  If that doesn't work, quickly double click the reset button twice.  If that doesn't work, disconnection the board from your PC and reconnect again ([seeed studio wiki](https://wiki.seeedstudio.com/XIAO_BLE/#access-the-swd-pins-for-debugging-and-reflashing-bootloader))
 5. A new folder will appear on your computer's desktop
-6. Download the `flash_erase*.uf2` file for your device on https://flasher.meshcore.io
+6. Download the `flash_erase*.uf2` file for your device on flasher.meshcore.co.uk
     - RAK WisBlock and Heltec T114: `Flash_erase-nRF32_softdevice_v6.uf2`
     - Seeed Studio Xiao nRF52 WIO: `Flash_erase-nRF52_softdevice_v7.uf2`
 8. drag and drop the uf2 file for your device to the root of the new folder
 9. Wait for the copy to complete.  You might get an error dialog, you can ignore it
-10. Go to https://flasher.meshcore.io, click `Console` and select the serial port for your connected device
+10. Go to https://flasher.meshcore.co.uk/, click `Console` and select the serial port for your connected device
 11. In the console, press enter.  Your flash should now be erased
 12. You may now flash the latest MeshCore firmware onto your device
 
-Separately, starting in firmware version 1.7.0, there is a CLI Rescue mode.  If your device has a user button (e.g. some RAK, T114), you can activate the rescue mode by hold down the user button of the device within 8 seconds of boot.  Then you can use the 'Console' on https://flasher.meshcore.io
+Separately, starting in firmware version 1.7.0, there is a CLI Rescue mode.  If your device has a user button (e.g. some RAK, T114), you can activate the rescue mode by hold down the user button of the device within 8 seconds of boot.  Then you can use the 'Console' on flasher.meshcore.co.uk
 
 ### 6.8. Q: WebFlasher fails on Linux with failed to open
 
@@ -745,7 +744,7 @@ Allow the browser user on it:
 **A:** The steps below work on both Android and iOS as nRF has made both apps' user interface the same on both platforms:
 
 1. Download nRF's DFU app from iOS App Store or Android's Play Store, you can find the app by searching for `nrf dfu`, the app's full name is `nRF Device Firmware Update`
-2. On https://flasher.meshcore.io, download the **ZIP** version of the firmware for your nRF device (e.g. RAK or Heltec T114 or Seeed Studio's Xiao)
+2. On flasher.meshcore.co.uk, download the **ZIP** version of the firmware for your nRF device (e.g. RAK or Heltec T114 or Seeed Studio's Xiao)
 3. From the MeshCore app, login remotely to the repeater you want to update with admin privilege
 4. Go to the Command Line tab, type `start ota` and hit enter.
 5. you should see `OK` to confirm the repeater device is now in OTA mode
@@ -768,7 +767,7 @@ After this bootloader is flashed onto the device, you can trigger over the air u
 ### 7.2. Q: How to update ESP32-based devices over the air?
 
 **A:** For ESP32-based devices (e.g. Heltec V3):
-1. On https://flasher.meshcore.io, download the **non-merged** version of the firmware for your ESP32 device (e.g. `Heltec_v3_repeater-v1.6.2-4449fd3.bin`, no `"merged"` in the file name)
+1. On flasher.meshcore.co.uk, download the **non-merged** version of the firmware for your ESP32 device (e.g. `Heltec_v3_repeater-v1.6.2-4449fd3.bin`, no `"merged"` in the file name)
 2. From the MeshCore app, login remotely to the repeater you want to update with admin privilege
 4. Go to the Command Line tab, type `start ota` and hit enter.
 5. you should see `OK` to confirm the repeater device is now in OTA mode
@@ -790,7 +789,7 @@ Currently, the following boards are supported:
 - Seeed Studio Wio Tracker L1
 - Seeed Studio XIAO nRF52840 BLE
 - Seeed Studio XIAO nRF52840 BLE SENSE
-- RAK 4631 
+- RAK 4631 (See note)
 - RAK WisMesh Tag (new 28/11/2025)
 
 ### 7.4. Q: are the MeshCore logo and font available?
@@ -820,10 +819,10 @@ Edit WIFI_SSID and WIFI_PWD in `./variants/heltec_v3/platformio.ini` and then fl
 
 ### 7.7. Q: I have a Station G2, or a Heltec V4, or an Ikoka Stick, or a radio with a EByte E22-900M30S or a E22-900M33S module, what should their transmit power be set to?
  **A:**
-For companion radios, you can set these radios' transmit power in the smartphone app.  For repeater and room server radios, you can set their transmit power using the command line command `set tx`.  You can get their current value using command line command `get tx`
+For companion radios, you can set these radios' transmit power in the smartphone app.  For repeater and room server radios, you can set their transmit power using the command line command `set tx`.  You can get their current value using command line comand `get tx`
 
 
-  ⚠️ **WARNING: Set these values at your own risk. Incorrect power settings can permanently damage your radio hardware.**
+ ### ⚠️ **WARNING: Set these values at your own risk. Incorrect power settings can permanently damage your radio hardware.**
 
 | Device / Model | Region / Description | In-App Setting (dBm) | Target Radio Output | Notes |
 | :--- | :--- | :--- | :--- | :--- |
