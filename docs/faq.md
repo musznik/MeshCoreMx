@@ -745,7 +745,7 @@ Allow the browser user on it:
 
 1. Download nRF's DFU app from iOS App Store or Android's Play Store, you can find the app by searching for `nrf dfu`, the app's full name is `nRF Device Firmware Update`
 2. On flasher.meshcore.co.uk, download the **ZIP** version of the firmware for your nRF device (e.g. RAK or Heltec T114 or Seeed Studio's Xiao)
-3. From the MeshCore app, login remotely to the repeater you want to update with admin privilege
+3. If updating a companion, skip to step 6 below.  If updating a repeater or room server, from the MeshCore app, login remotely to the repeater you want to update with admin privilege
 4. Go to the Command Line tab, type `start ota` and hit enter.
 5. you should see `OK` to confirm the repeater device is now in OTA mode
 6. Run the DFU app,tab `Settings` on the top right corner
