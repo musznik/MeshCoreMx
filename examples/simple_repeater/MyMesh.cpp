@@ -147,6 +147,15 @@ static bool isGuestCliCommand(const char *command) {
   if (strcmp(command, "ping") == 0) {
     return true;
   }
+  if (memcmp(command, "stats", 5) == 0 && (command[5] == 0 || command[5] == ' ')) {
+    const char *sub = command + 5;
+    while (*sub == ' ') {
+      sub++;
+    }
+    if (strcmp(sub, "rx") == 0 || strcmp(sub, "tx") == 0 || strcmp(sub, "rxtx") == 0) {
+      return true;
+    }
+  }
   if (memcmp(command, "8ball", 5) == 0 && (command[5] == 0 || command[5] == ' ')) {
     return true;
   }
@@ -559,6 +568,8 @@ void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
   }
 #endif
 
+  traffic_history.recordRx(millis());
+
   if (_logging) {
     File f = openAppend(PACKET_LOG_FILE);
     if (f) {
@@ -584,6 +595,8 @@ void MyMesh::logTx(mesh::Packet *pkt, int len) {
     bridge.sendPacket(pkt);
   }
 #endif
+
+  traffic_history.recordTx(millis());
 
   if (_logging) {
     File f = openAppend(PACKET_LOG_FILE);
@@ -1475,6 +1488,20 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
     }
   } else if (strcmp(command, "ping") == 0) {
     formatPathReply(reply, 160, active_cli_path, active_cli_path_len);
+  } else if (memcmp(command, "stats", 5) == 0 && (command[5] == 0 || command[5] == ' ')) {
+    const char* parts[2];
+    int n = mesh::Utils::parseTextParts(command, parts, 2, ' ');
+    if (n != 2) {
+      strcpy(reply, "use: stats rx|tx|rxtx");
+    } else if (strcmp(parts[1], "rx") == 0) {
+      traffic_history.formatRx(reply, 160, millis());
+    } else if (strcmp(parts[1], "tx") == 0) {
+      traffic_history.formatTx(reply, 160, millis());
+    } else if (strcmp(parts[1], "rxtx") == 0) {
+      traffic_history.formatRxTx(reply, 160, millis());
+    } else {
+      strcpy(reply, "use: stats rx|tx|rxtx");
+    }
   } else if (memcmp(command, "roll", 4) == 0 && (command[4] == 0 || command[4] == ' ')) {
     const char* parts[2];
     int n = mesh::Utils::parseTextParts(command, parts, 2, ' ');
@@ -1507,7 +1534,7 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
     uint32_t idx = getRNG()->nextInt(0, sizeof(answers) / sizeof(answers[0]));
     strcpy(reply, answers[idx]);
   } else if (strcmp(command, "help") == 0 || strcmp(command, "help guest") == 0) {
-    strcpy(reply, "guest: help, ping, roll [N], coin, 8ball [question]");
+    strcpy(reply, "guest: help, ping, stats rx|tx|rxtx, roll [N], coin, 8ball [question]");
   } else{
     _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
   }
