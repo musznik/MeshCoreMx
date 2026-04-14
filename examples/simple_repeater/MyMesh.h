@@ -34,6 +34,7 @@
 #include <helpers/TxtDataHelpers.h>
 #include <helpers/RegionMap.h>
 #include "RateLimiter.h"
+#include "TrafficHistory.h"
 
 #ifdef WITH_BRIDGE
 extern AbstractBridge* bridge;
@@ -115,6 +116,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   int  matching_peer_indexes[MAX_CLIENTS];
   uint8_t active_cli_path_len;
   uint8_t active_cli_path[MAX_PATH_SIZE];
+  TrafficHistory traffic_history;
 #if defined(WITH_RS232_BRIDGE)
   RS232Bridge bridge;
 #elif defined(WITH_ESPNOW_BRIDGE)
