@@ -59,6 +59,103 @@
 #define CLI_REPLY_DELAY_MILLIS      600
 
 #define LAZY_CONTACTS_WRITE_DELAY    5000
+#define AUTO_RESPONDER_CHANNEL      "#test"
+#define AUTO_RESPONDER_COMMAND      ".wping"
+#define AUTO_RESPONDER_COMMAND2     ".wping2"
+#define AUTO_RESPONDER_REPLY_DELAY  250
+
+static void deriveHashtagChannel(mesh::GroupChannel &channel, const char *name) {
+  memset(&channel, 0, sizeof(channel));
+
+  mesh::Utils::sha256(channel.secret, 16, (const uint8_t *)name, strlen(name));
+  mesh::Utils::sha256(channel.hash, sizeof(channel.hash), channel.secret, 16);
+}
+
+static void formatPathHashes(char *dest, size_t dest_size, const uint8_t *path, uint8_t path_len) {
+  if (dest_size == 0) {
+    return;
+  }
+
+  dest[0] = 0;
+  uint8_t hash_count = path_len & 63;
+  uint8_t hash_size = (path_len >> 6) + 1;
+  size_t used = 0;
+
+  for (uint8_t i = 0; i < hash_count; i++) {
+    if (i > 0) {
+      if (used + 1 >= dest_size) {
+        break;
+      }
+      dest[used++] = '>';
+      dest[used] = 0;
+    }
+
+    for (uint8_t j = 0; j < hash_size; j++) {
+      if (used + 2 >= dest_size) {
+        goto truncated;
+      }
+      snprintf(&dest[used], dest_size - used, "%02X", path[i * hash_size + j]);
+      used += 2;
+    }
+  }
+
+  return;
+
+truncated:
+  if (dest_size >= 4) {
+    size_t ellipsis_at = used;
+    if (ellipsis_at > dest_size - 4) {
+      ellipsis_at = dest_size - 4;
+    }
+    memcpy(&dest[ellipsis_at], "...", 4);
+  } else {
+    dest[dest_size - 1] = 0;
+  }
+}
+
+static void formatPathReply(char *dest, size_t dest_size, const uint8_t *path, uint8_t path_len) {
+  uint8_t hops = path_len & 63;
+  char path_hashes[64];
+
+  path_hashes[0] = 0;
+  if (path != NULL && path_len != 0) {
+    formatPathHashes(path_hashes, sizeof(path_hashes), path, path_len);
+  }
+
+  if (path_hashes[0] != 0) {
+    snprintf(dest, dest_size, "%u hops: %s", (unsigned int)hops, path_hashes);
+  } else {
+    snprintf(dest, dest_size, "%u hops", (unsigned int)hops);
+  }
+}
+
+static bool isGuestCliCommand(const char *command) {
+  while (*command == ' ') {
+    command++;
+  }
+
+  if (strlen(command) > 4 && command[2] == '|') {
+    command += 3;
+  }
+
+  if (memcmp(command, "roll", 4) == 0 && (command[4] == 0 || command[4] == ' ')) {
+    return true;
+  }
+  if (strcmp(command, "coin") == 0) {
+    return true;
+  }
+  if (strcmp(command, "ping") == 0) {
+    return true;
+  }
+  if (memcmp(command, "8ball", 5) == 0 && (command[5] == 0 || command[5] == ' ')) {
+    return true;
+  }
+  if (strcmp(command, "help") == 0 || strcmp(command, "help guest") == 0) {
+    return true;
+  }
+
+  return false;
+}
 
 void MyMesh::putNeighbour(const mesh::Identity &id, uint32_t timestamp, float snr) {
 #if MAX_NEIGHBOURS // check if neighbours enabled
@@ -136,7 +233,7 @@ uint8_t MyMesh::handleLoginReq(const mesh::Identity& sender, const uint8_t* secr
   memcpy(reply_data, &now, 4);   // response packets always prefixed with timestamp
   reply_data[4] = RESP_SERVER_LOGIN_OK;
   reply_data[5] = 0;  // Legacy: was recommended keep-alive interval (secs / 16)
-  reply_data[6] = client->isAdmin() ? 1 : 0;
+  reply_data[6] = client->isAdmin() || ((client->permissions & PERM_ACL_ROLE_MASK) == PERM_ACL_GUEST) ? 1 : 0;
   reply_data[7] = client->permissions;
   getRNG()->random(&reply_data[8], 4);   // random blob to help packet-hash uniqueness
   reply_data[12] = FIRMWARE_VER_LEVEL;  // New field
@@ -600,6 +697,19 @@ int MyMesh::searchPeersByHash(const uint8_t *hash) {
   return n;
 }
 
+int MyMesh::searchChannelsByHash(const uint8_t *hash, mesh::GroupChannel channels[], int max_matches) {
+  if (max_matches <= 0) {
+    return 0;
+  }
+
+  if (memcmp(hash, responder_channel.hash, sizeof(responder_channel.hash)) == 0) {
+    channels[0] = responder_channel;
+    return 1;
+  }
+
+  return 0;
+}
+
 void MyMesh::getPeerSharedSecret(uint8_t *dest_secret, int peer_idx) {
   int i = matching_peer_indexes[peer_idx];
   if (i >= 0 && i < acl.getNumClients()) {
@@ -669,7 +779,7 @@ void MyMesh::onPeerDataRecv(mesh::Packet *packet, uint8_t type, int sender_idx, 
     } else {
       MESH_DEBUG_PRINTLN("onPeerDataRecv: possible replay attack detected");
     }
-  } else if (type == PAYLOAD_TYPE_TXT_MSG && len > 5 && client->isAdmin()) { // a CLI command
+  } else if (type == PAYLOAD_TYPE_TXT_MSG && len > 5) { // a CLI command
     uint32_t sender_timestamp;
     memcpy(&sender_timestamp, data, 4); // timestamp (by sender's RTC clock - which could be wrong)
     uint8_t flags = (data[4] >> 2);        // message attempt number, and other flags
@@ -705,8 +815,18 @@ void MyMesh::onPeerDataRecv(mesh::Packet *packet, uint8_t type, int sender_idx, 
       char *reply = (char *)&temp[5];
       if (is_retry) {
         *reply = 0;
-      } else {
+      } else if (client->isAdmin() || isGuestCliCommand(command)) {
+        if (packet->isRouteFlood()) {
+          active_cli_path_len = mesh::Packet::copyPath(active_cli_path, packet->path, packet->path_len);
+        } else if (client->out_path_len != OUT_PATH_UNKNOWN) {
+          active_cli_path_len = mesh::Packet::copyPath(active_cli_path, client->out_path, client->out_path_len);
+        } else {
+          active_cli_path_len = 0;
+        }
         handleCommand(sender_timestamp, command, reply);
+        active_cli_path_len = 0;
+      } else {
+        *reply = 0;
       }
       int text_len = strlen(reply);
       if (text_len > 0) {
@@ -730,6 +850,72 @@ void MyMesh::onPeerDataRecv(mesh::Packet *packet, uint8_t type, int sender_idx, 
     } else {
       MESH_DEBUG_PRINTLN("onPeerDataRecv: possible replay attack detected");
     }
+  }
+}
+
+void MyMesh::onGroupDataRecv(mesh::Packet *packet, uint8_t type, const mesh::GroupChannel &channel, uint8_t *data, size_t len) {
+  if (type != PAYLOAD_TYPE_GRP_TXT || len <= 5) {
+    return;
+  }
+  if ((data[4] >> 2) != TXT_TYPE_PLAIN) {
+    return;
+  }
+  if (memcmp(channel.hash, responder_channel.hash, sizeof(channel.hash)) != 0) {
+    return;
+  }
+
+  uint8_t text_len = min((size_t)(MAX_PACKET_PAYLOAD - 1), len) - 5;
+  char text[MAX_PACKET_PAYLOAD];
+  memcpy(text, &data[5], text_len);
+  text[text_len] = 0;
+
+  while (text_len > 0 && (text[text_len - 1] == ' ' || text[text_len - 1] == '\r' || text[text_len - 1] == '\n' || text[text_len - 1] == '\t')) {
+    text[--text_len] = 0;
+  }
+
+  char *command = text;
+  while (*command == ' ' || *command == '\t') {
+    command++;
+  }
+
+  if (*command != '.') {
+    char *separator = strchr(command, ':');
+    if (separator != NULL) {
+      command = separator + 1;
+      while (*command == ' ' || *command == '\t') {
+        command++;
+      }
+    }
+  }
+
+  MESH_DEBUG_PRINTLN("Group text on %s: '%s' -> command='%s'", AUTO_RESPONDER_CHANNEL, text, command);
+
+  bool is_pingw = strcmp(command, AUTO_RESPONDER_COMMAND) == 0;
+  bool is_pingw2 = strcmp(command, AUTO_RESPONDER_COMMAND2) == 0;
+  if (!is_pingw && !is_pingw2) {
+    return;
+  }
+
+  char reply[96];
+  uint8_t hops = packet->isRouteFlood() ? packet->getPathHashCount() : 0;
+  if (is_pingw2) {
+    formatPathReply(reply, sizeof(reply), packet->path, packet->path_len);
+  } else {
+    snprintf(reply, sizeof(reply), "%u hops", (unsigned int)hops);
+  }
+  MESH_DEBUG_PRINTLN("Auto-responder matched %s on %s, hops=%d", command, AUTO_RESPONDER_CHANNEL, (int)hops);
+
+  uint8_t payload[MAX_PACKET_PAYLOAD];
+  uint32_t now = getRTCClock()->getCurrentTimeUnique();
+  memcpy(payload, &now, 4);
+  payload[4] = 0;  // TXT_TYPE_PLAIN
+
+  snprintf((char *)&payload[5], sizeof(payload) - 5, "%s: %s", _prefs.node_name, reply);
+  size_t reply_len = strlen((char *)&payload[5]);
+
+  mesh::Packet *response = createGroupDatagram(PAYLOAD_TYPE_GRP_TXT, responder_channel, payload, 5 + reply_len);
+  if (response) {
+    sendFlood(response, AUTO_RESPONDER_REPLY_DELAY, _prefs.path_hash_mode + 1);
   }
 }
 
@@ -848,6 +1034,7 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
   set_radio_at = revert_radio_at = 0;
   _logging = false;
   region_load_active = false;
+  active_cli_path_len = 0;
 
 #if MAX_NEIGHBOURS
   memset(neighbours, 0, sizeof(neighbours));
@@ -899,6 +1086,7 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
 
   pending_discover_tag = 0;
   pending_discover_until = 0;
+  deriveHashtagChannel(responder_channel, AUTO_RESPONDER_CHANNEL);
 }
 
 void MyMesh::begin(FILESYSTEM *fs) {
@@ -1285,6 +1473,41 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
       sendNodeDiscoverReq();
       strcpy(reply, "OK - Discover sent");
     }
+  } else if (strcmp(command, "ping") == 0) {
+    formatPathReply(reply, 160, active_cli_path, active_cli_path_len);
+  } else if (memcmp(command, "roll", 4) == 0 && (command[4] == 0 || command[4] == ' ')) {
+    const char* parts[2];
+    int n = mesh::Utils::parseTextParts(command, parts, 2, ' ');
+    uint32_t sides = 6;
+
+    if (n == 2) {
+      int parsed = atoi(parts[1]);
+      if (parsed < 2 || parsed > 1000) {
+        strcpy(reply, "error, min 2, max 1000");
+        return;
+      }
+      sides = (uint32_t)parsed;
+    }
+
+    uint32_t result = getRNG()->nextInt(1, sides + 1);
+    sprintf(reply, "roll d%u = %u", (unsigned int)sides, (unsigned int)result);
+  } else if (strcmp(command, "coin") == 0) {
+    strcpy(reply, getRNG()->nextInt(0, 2) == 0 ? "coin = heads" : "coin = tails");
+  } else if (memcmp(command, "8ball", 5) == 0 && (command[5] == 0 || command[5] == ' ')) {
+    static const char *answers[] = {
+      "8ball = tak",
+      "8ball = nie",
+      "8ball = może",
+      "8ball = spytaj później",
+      "8ball = definitnie",
+      "8ball = niemożliwe",
+      "8ball = znaki wskazują na tak",
+      "8ball = bardzo mało prawdopodobne"
+    };
+    uint32_t idx = getRNG()->nextInt(0, sizeof(answers) / sizeof(answers[0]));
+    strcpy(reply, answers[idx]);
+  } else if (strcmp(command, "help") == 0 || strcmp(command, "help guest") == 0) {
+    strcpy(reply, "guest: help, ping, roll [N], coin, 8ball [question]");
   } else{
     _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
   }
