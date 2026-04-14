@@ -1294,6 +1294,7 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
   deriveHashtagChannel(responder_channel, AUTO_RESPONDER_CHANNEL);
   deriveHashtagChannel(rpg_channel, MCRPG_TECH_CHANNEL);
   memset(default_scope.key, 0, sizeof(default_scope.key));
+  deriveHashtagChannel(responder_channel, AUTO_RESPONDER_CHANNEL);
 }
 
 void MyMesh::begin(FILESYSTEM *fs) {
