@@ -35,6 +35,10 @@
 #include <helpers/RegionMap.h>
 #include "RateLimiter.h"
 #include "TrafficHistory.h"
+#include "rpg/RpgConvoyState.h"
+#include "rpg/RpgGame.h"
+#include "rpg/RpgRemoteState.h"
+#include "rpg/RpgWorldState.h"
 
 #ifdef WITH_BRIDGE
 extern AbstractBridge* bridge;
@@ -100,6 +104,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   RegionEntry* recv_pkt_region;
   TransportKey default_scope;
   RateLimiter discover_limiter, anon_limiter;
+  RateLimiter rpg_group_limiter;
   uint32_t pending_discover_tag;
   unsigned long pending_discover_until;
   bool region_load_active;
@@ -108,6 +113,7 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   NeighbourInfo neighbours[MAX_NEIGHBOURS];
 #endif
   mesh::GroupChannel responder_channel;
+  mesh::GroupChannel rpg_channel;
   CayenneLPP telemetry;
   unsigned long set_radio_at, revert_radio_at;
   float pending_freq;
@@ -117,7 +123,13 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   int  matching_peer_indexes[MAX_CLIENTS];
   uint8_t active_cli_path_len;
   uint8_t active_cli_path[MAX_PATH_SIZE];
+  uint8_t active_cli_player_id[PUB_KEY_SIZE];
+  uint8_t active_cli_player_id_len;
   TrafficHistory traffic_history;
+  RpgConvoyState rpg_convoy_state;
+  RpgGame rpg_game;
+  RpgRemoteState rpg_remote_state;
+  RpgWorldState rpg_world_state;
 #if defined(WITH_RS232_BRIDGE)
   RS232Bridge bridge;
 #elif defined(WITH_ESPNOW_BRIDGE)
@@ -131,6 +143,16 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   uint8_t handleAnonClockReq(const mesh::Identity& sender, uint32_t sender_timestamp, const uint8_t* data);
   int handleRequest(ClientInfo* sender, uint32_t sender_timestamp, uint8_t* payload, size_t payload_len);
   mesh::Packet* createSelfAdvert();
+  mesh::Packet* createRpgRawReply(const mesh::Identity& dest, const uint8_t* secret, uint8_t type,
+                                  const uint8_t* body, size_t body_len);
+  mesh::Packet* createRpgGroupPacket(const uint8_t* data, size_t len);
+  bool handleAutoResponderGroupText(mesh::Packet* packet, uint8_t type, const mesh::GroupChannel& channel,
+                                    const uint8_t* data, size_t len);
+  int sendRpgPresence();
+  bool sendDirectBackToFloodSender(mesh::Packet* packet, mesh::Packet* reply);
+  bool handleRpgConvoyCommand(const uint8_t* player_id, size_t player_id_len, char* command, char* reply);
+  bool resolveRpgTargetByPrefix(const char* prefix, mesh::Identity& id, char* name, size_t name_size) const;
+  int sendRpgDiscoverRequest(const uint8_t* target_prefix, uint8_t target_prefix_len);
 
   File openAppend(const char* fname);
   bool isLooped(const mesh::Packet* packet, const uint8_t max_counters[]);
@@ -179,6 +201,7 @@ protected:
   void onGroupDataRecv(mesh::Packet* packet, uint8_t type, const mesh::GroupChannel& channel, uint8_t* data, size_t len) override;
   bool onPeerPathRecv(mesh::Packet* packet, int sender_idx, const uint8_t* secret, uint8_t* path, uint8_t path_len, uint8_t extra_type, uint8_t* extra, uint8_t extra_len) override;
   void onControlDataRecv(mesh::Packet* packet) override;
+  void onRawDataRecv(mesh::Packet* packet) override;
 
   void sendFloodReply(mesh::Packet* packet, unsigned long delay_millis, uint8_t path_hash_size);
 

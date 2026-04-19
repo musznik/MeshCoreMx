@@ -1,5 +1,7 @@
 #include "MyMesh.h"
+#include "rpg/RpgGroupProtocol.h"
 #include <algorithm>
+#include <stdlib.h>
 
 /* ------------------------------ Config -------------------------------- */
 
@@ -55,6 +57,7 @@
 #define ANON_REQ_TYPE_REGIONS      0x01
 #define ANON_REQ_TYPE_OWNER        0x02
 #define ANON_REQ_TYPE_BASIC        0x03   // just remote clock
+#define ANON_REQ_TYPE_RPG          0x04
 
 #define CLI_REPLY_DELAY_MILLIS      600
 
@@ -63,6 +66,15 @@
 #define AUTO_RESPONDER_COMMAND      ".wping"
 #define AUTO_RESPONDER_COMMAND2     ".wping2"
 #define AUTO_RESPONDER_REPLY_DELAY  250
+#define MCRPG_TECH_CHANNEL         "#mcrpg-tech"
+
+#define RPG_RAW_MAGIC              0xA7
+#define RPG_RAW_TYPE_CONVOY_ACK    0x01
+#define RPG_RAW_TYPE_CONVOY_WAIT   0x02
+#define RPG_RAW_TYPE_CONVOY_RESULT 0x03
+#define RPG_RAW_TYPE_CONVOY_ERROR  0x04
+#define RPG_REQ_CONVOY_SEND        0x01
+#define RPG_REQ_CONVOY_COLLECT     0x02
 
 static void deriveHashtagChannel(mesh::GroupChannel &channel, const char *name) {
   memset(&channel, 0, sizeof(channel));
@@ -129,6 +141,38 @@ static void formatPathReply(char *dest, size_t dest_size, const uint8_t *path, u
   }
 }
 
+static void reversePath(uint8_t *dest, const uint8_t *src, uint8_t path_len) {
+  uint8_t hash_count = path_len & 63;
+  uint8_t hash_size = (path_len >> 6) + 1;
+  for (uint8_t i = 0; i < hash_count; i++) {
+    memcpy(&dest[i * hash_size], &src[(hash_count - 1 - i) * hash_size], hash_size);
+  }
+}
+
+static bool parseHexPrefixBytes(const char* text, uint8_t* dest, uint8_t* dest_len) {
+  *dest_len = 0;
+  while (*text == ' ') {
+    text++;
+  }
+  size_t len = strlen(text);
+  if (len == 0 || (len & 1) != 0 || len > 16) {
+    return false;
+  }
+  for (size_t i = 0; i < len; i += 2) {
+    char tmp[3];
+    tmp[0] = text[i];
+    tmp[1] = text[i + 1];
+    tmp[2] = 0;
+    char* end = NULL;
+    long value = strtol(tmp, &end, 16);
+    if (end == NULL || *end != 0 || value < 0 || value > 255) {
+      return false;
+    }
+    dest[(*dest_len)++] = (uint8_t)value;
+  }
+  return true;
+}
+
 static bool isGuestCliCommand(const char *command) {
   while (*command == ' ') {
     command++;
@@ -155,6 +199,9 @@ static bool isGuestCliCommand(const char *command) {
     if (strcmp(sub, "rx") == 0 || strcmp(sub, "tx") == 0 || strcmp(sub, "rxtx") == 0) {
       return true;
     }
+  }
+  if (memcmp(command, "rpg", 3) == 0 && (command[3] == 0 || command[3] == ' ')) {
+    return true;
   }
   if (memcmp(command, "8ball", 5) == 0 && (command[5] == 0 || command[5] == ' ')) {
     return true;
@@ -488,8 +535,164 @@ int MyMesh::handleRequest(ClientInfo *sender, uint32_t sender_timestamp, uint8_t
 mesh::Packet *MyMesh::createSelfAdvert() {
   uint8_t app_data[MAX_ADVERT_DATA_SIZE];
   uint8_t app_data_len = _cli.buildAdvertData(ADV_TYPE_REPEATER, app_data);
-
   return createAdvert(self_id, app_data, app_data_len);
+}
+
+mesh::Packet *MyMesh::createRpgRawReply(const mesh::Identity& dest, const uint8_t* secret, uint8_t type,
+                                        const uint8_t* body, size_t body_len) {
+  uint8_t payload[MAX_PACKET_PAYLOAD];
+  if (body_len + 2 + PUB_KEY_SIZE + CIPHER_MAC_SIZE + CIPHER_BLOCK_SIZE > sizeof(payload)) {
+    return NULL;
+  }
+  payload[0] = RPG_RAW_MAGIC;
+  payload[1] = type;
+  memcpy(&payload[2], self_id.pub_key, PUB_KEY_SIZE);
+  int enc_len = mesh::Utils::encryptThenMAC(secret, &payload[2 + PUB_KEY_SIZE], body, body_len);
+  return createRawData(payload, 2 + PUB_KEY_SIZE + enc_len);
+}
+
+mesh::Packet *MyMesh::createRpgGroupPacket(const uint8_t* data, size_t len) {
+  return createGroupDatagram(PAYLOAD_TYPE_GRP_DATA, rpg_channel, data, len);
+}
+
+bool MyMesh::handleAutoResponderGroupText(mesh::Packet* packet, uint8_t type, const mesh::GroupChannel& channel,
+                                          const uint8_t* data, size_t len) {
+  if (type != PAYLOAD_TYPE_GRP_TXT || len <= 5) {
+    return false;
+  }
+  if ((data[4] >> 2) != TXT_TYPE_PLAIN) {
+    return false;
+  }
+  if (memcmp(channel.hash, responder_channel.hash, sizeof(channel.hash)) != 0) {
+    return false;
+  }
+
+  uint8_t text_len = min((size_t)(MAX_PACKET_PAYLOAD - 1), len) - 5;
+  char text[MAX_PACKET_PAYLOAD];
+  memcpy(text, &data[5], text_len);
+  text[text_len] = 0;
+
+  while (text_len > 0 && (text[text_len - 1] == ' ' || text[text_len - 1] == '\r' || text[text_len - 1] == '\n' || text[text_len - 1] == '\t')) {
+    text[--text_len] = 0;
+  }
+
+  char *command = text;
+  while (*command == ' ' || *command == '\t') {
+    command++;
+  }
+
+  if (*command != '.') {
+    char *separator = strchr(command, ':');
+    if (separator != NULL) {
+      command = separator + 1;
+      while (*command == ' ' || *command == '\t') {
+        command++;
+      }
+    }
+  }
+
+  MESH_DEBUG_PRINTLN("Group text on %s: '%s' -> command='%s'", AUTO_RESPONDER_CHANNEL, text, command);
+
+  bool is_pingw = strcmp(command, AUTO_RESPONDER_COMMAND) == 0;
+  bool is_pingw2 = strcmp(command, AUTO_RESPONDER_COMMAND2) == 0;
+  if (!is_pingw && !is_pingw2) {
+    return false;
+  }
+
+  char reply[96];
+  uint8_t hops = packet->isRouteFlood() ? packet->getPathHashCount() : 0;
+  if (is_pingw2) {
+    formatPathReply(reply, sizeof(reply), packet->path, packet->path_len);
+  } else {
+    snprintf(reply, sizeof(reply), "%u hops", (unsigned int)hops);
+  }
+  MESH_DEBUG_PRINTLN("Auto-responder matched %s on %s, hops=%d", command, AUTO_RESPONDER_CHANNEL, (int)hops);
+
+  uint8_t payload[MAX_PACKET_PAYLOAD];
+  uint32_t now = getRTCClock()->getCurrentTimeUnique();
+  memcpy(payload, &now, 4);
+  payload[4] = 0;  // TXT_TYPE_PLAIN
+
+  snprintf((char *)&payload[5], sizeof(payload) - 5, "%s: %s", _prefs.node_name, reply);
+  size_t reply_len = strlen((char *)&payload[5]);
+
+  mesh::Packet *response = createGroupDatagram(PAYLOAD_TYPE_GRP_TXT, responder_channel, payload, 5 + reply_len);
+  if (response) {
+    sendFlood(response, AUTO_RESPONDER_REPLY_DELAY, _prefs.path_hash_mode + 1);
+  }
+  return true;
+}
+
+int MyMesh::sendRpgPresence() {
+  uint8_t payload[96];
+  size_t out = RpgGroupProtocol::buildPresence(payload, self_id, _prefs.node_name, millis(), rpg_world_state);
+
+  mesh::Packet* pkt = createRpgGroupPacket(payload, out);
+  if (pkt == NULL) {
+    return 0;
+  }
+  sendFlood(pkt, (uint32_t)0, _prefs.path_hash_mode + 1);
+  return 1;
+}
+
+bool MyMesh::sendDirectBackToFloodSender(mesh::Packet* packet, mesh::Packet* reply) {
+  if (packet == NULL || reply == NULL) {
+    return false;
+  }
+  if (packet->path_len == 0) {
+    sendZeroHop(reply, SERVER_RESPONSE_DELAY);
+    return true;
+  }
+  uint8_t reversed[MAX_PATH_SIZE];
+  reversePath(reversed, packet->path, packet->path_len);
+  sendDirect(reply, reversed, packet->path_len, SERVER_RESPONSE_DELAY);
+  return true;
+}
+
+bool MyMesh::resolveRpgTargetByPrefix(const char* prefix, mesh::Identity& id, char* name, size_t name_size) const {
+  if (rpg_remote_state.resolveNodeByPrefix(prefix, id, name, name_size)) {
+    return true;
+  }
+#if MAX_NEIGHBOURS
+  for (int i = 0; i < MAX_NEIGHBOURS; i++) {
+    const NeighbourInfo& neighbour = neighbours[i];
+    if (neighbour.heard_timestamp == 0) {
+      continue;
+    }
+    char hex[17];
+    snprintf(hex, sizeof(hex), "%02X%02X%02X%02X%02X%02X%02X%02X",
+             (unsigned int)neighbour.id.pub_key[0], (unsigned int)neighbour.id.pub_key[1],
+             (unsigned int)neighbour.id.pub_key[2], (unsigned int)neighbour.id.pub_key[3],
+             (unsigned int)neighbour.id.pub_key[4], (unsigned int)neighbour.id.pub_key[5],
+             (unsigned int)neighbour.id.pub_key[6], (unsigned int)neighbour.id.pub_key[7]);
+    size_t prefix_len = strlen(prefix);
+    if (prefix_len > 0 && prefix_len <= strlen(hex) && strncasecmp(hex, prefix, prefix_len) == 0) {
+      id = neighbour.id;
+      if (name != NULL && name_size > 0) {
+        char short_hex[10];
+        mesh::Utils::toHex(short_hex, neighbour.id.pub_key, 4);
+        snprintf(name, name_size, "%s", short_hex);
+      }
+      return true;
+    }
+  }
+#endif
+  return false;
+}
+
+int MyMesh::sendRpgDiscoverRequest(const uint8_t* target_prefix, uint8_t target_prefix_len) {
+  if (target_prefix_len > 8) {
+    return 0;
+  }
+  uint8_t data[64];
+  uint32_t tag = getRTCClock()->getCurrentTimeUnique();
+  size_t len = RpgGroupProtocol::buildDiscoverRequest(data, self_id, tag, target_prefix, target_prefix_len);
+  mesh::Packet* pkt = createRpgGroupPacket(data, len);
+  if (pkt == NULL) {
+    return 0;
+  }
+  sendFlood(pkt, (uint32_t)0, _prefs.path_hash_mode + 1);
+  return 1;
 }
 
 File MyMesh::openAppend(const char *fname) {
@@ -685,6 +888,65 @@ void MyMesh::onAnonDataRecv(mesh::Packet *packet, const uint8_t *secret, const m
     reply_path_len = -1;
     if (data[4] == 0 || data[4] >= ' ') {   // is password, ie. a login request
       reply_len = handleLoginReq(sender, secret, timestamp, &data[4], packet->isRouteFlood());
+    } else if (data[4] == ANON_REQ_TYPE_RPG && packet->isRouteFlood() && len >= 6) {
+      uint8_t req_type = data[5];
+
+      if (len >= 18 && req_type == RPG_REQ_CONVOY_SEND) {
+        uint32_t convoy_id;
+        memcpy(&convoy_id, &data[6], 4);
+        const uint8_t* player_key = &data[10];
+        rpg_convoy_state.upsertRemote(convoy_id, sender.pub_key, player_key, 8, millis());
+        uint8_t body[4];
+        memcpy(body, &convoy_id, 4);
+        mesh::Packet* raw = createRpgRawReply(sender, secret, RPG_RAW_TYPE_CONVOY_ACK, body, sizeof(body));
+        if (raw) {
+          sendDirectBackToFloodSender(packet, raw);
+        }
+        return;
+      } else if (len >= 18 && req_type == RPG_REQ_CONVOY_COLLECT) {
+        uint32_t convoy_id;
+        memcpy(&convoy_id, &data[6], 4);
+        RpgConvoyState::RemoteConvoy remote;
+        uint8_t body[16];
+        memcpy(body, &convoy_id, 4);
+        if (!rpg_convoy_state.getRemote(convoy_id, sender.pub_key, remote)) {
+          body[4] = 1;
+          mesh::Packet* raw = createRpgRawReply(sender, secret, RPG_RAW_TYPE_CONVOY_ERROR, body, 5);
+          if (raw) {
+            sendDirectBackToFloodSender(packet, raw);
+          }
+        } else {
+          uint32_t elapsed = (uint32_t)(millis() - remote.arrived_at_ms);
+          if (elapsed < RpgConvoyState::CONVOY_STAY_MS) {
+            uint16_t mins = (uint16_t)((RpgConvoyState::CONVOY_STAY_MS - elapsed + 59999UL) / 60000UL);
+            memcpy(&body[4], &mins, 2);
+            mesh::Packet* raw = createRpgRawReply(sender, secret, RPG_RAW_TYPE_CONVOY_WAIT, body, 6);
+            if (raw) {
+              sendDirectBackToFloodSender(packet, raw);
+            }
+          } else {
+            if (!remote.result_finalized) {
+              uint16_t wood = rpg_world_state.takeWood((uint16_t)getRNG()->nextInt(1, 4), millis());
+              uint16_t ore = rpg_world_state.takeOre((uint16_t)getRNG()->nextInt(1, 4), millis());
+              uint16_t herbs = rpg_world_state.takeHerbs((uint16_t)getRNG()->nextInt(0, 2), millis());
+              uint16_t relics = rpg_world_state.takeRelics((uint16_t)getRNG()->nextInt(0, 2), millis());
+              uint16_t gold = rpg_world_state.takeGold((uint16_t)getRNG()->nextInt(2, 7), millis());
+              rpg_convoy_state.finalizeRemoteResult(convoy_id, sender.pub_key, wood, ore, herbs, relics, gold);
+              rpg_convoy_state.getRemote(convoy_id, sender.pub_key, remote);
+            }
+            memcpy(&body[4], &remote.wood, 2);
+            memcpy(&body[6], &remote.ore, 2);
+            memcpy(&body[8], &remote.herbs, 2);
+            memcpy(&body[10], &remote.relics, 2);
+            memcpy(&body[12], &remote.gold, 2);
+            mesh::Packet* raw = createRpgRawReply(sender, secret, RPG_RAW_TYPE_CONVOY_RESULT, body, 14);
+            if (raw) {
+              sendDirectBackToFloodSender(packet, raw);
+            }
+          }
+        }
+        return;
+      }
     } else if (data[4] == ANON_REQ_TYPE_REGIONS && packet->isRouteDirect()) {
       reply_len = handleAnonRegionsReq(sender, timestamp, &data[5]);
     } else if (data[4] == ANON_REQ_TYPE_OWNER && packet->isRouteDirect()) {
@@ -728,12 +990,19 @@ int MyMesh::searchChannelsByHash(const uint8_t *hash, mesh::GroupChannel channel
     return 0;
   }
 
+  int count = 0;
   if (memcmp(hash, responder_channel.hash, sizeof(responder_channel.hash)) == 0) {
-    channels[0] = responder_channel;
-    return 1;
+    channels[count++] = responder_channel;
+    if (count >= max_matches) {
+      return count;
+    }
   }
 
-  return 0;
+  if (memcmp(hash, rpg_channel.hash, sizeof(rpg_channel.hash)) == 0) {
+    channels[count++] = rpg_channel;
+  }
+
+  return count;
 }
 
 void MyMesh::getPeerSharedSecret(uint8_t *dest_secret, int peer_idx) {
@@ -756,10 +1025,10 @@ static bool isShare(const mesh::Packet *packet) {
 void MyMesh::onAdvertRecv(mesh::Packet *packet, const mesh::Identity &id, uint32_t timestamp,
                           const uint8_t *app_data, size_t app_data_len) {
   mesh::Mesh::onAdvertRecv(packet, id, timestamp, app_data, app_data_len); // chain to super impl
+  AdvertDataParser parser(app_data, app_data_len);
 
   // if this a zero hop advert (and not via 'Share'), add it to neighbours
   if (packet->path_len == 0 && !isShare(packet)) {
-    AdvertDataParser parser(app_data, app_data_len);
     if (parser.isValid() && parser.getType() == ADV_TYPE_REPEATER) { // just keep neigbouring Repeaters
       putNeighbour(id, timestamp, packet->getSNR());
     }
@@ -849,8 +1118,11 @@ void MyMesh::onPeerDataRecv(mesh::Packet *packet, uint8_t type, int sender_idx, 
         } else {
           active_cli_path_len = 0;
         }
+        memcpy(active_cli_player_id, client->id.pub_key, PUB_KEY_SIZE);
+        active_cli_player_id_len = PUB_KEY_SIZE;
         handleCommand(sender_timestamp, command, reply);
         active_cli_path_len = 0;
+        active_cli_player_id_len = 0;
       } else {
         *reply = 0;
       }
@@ -880,69 +1152,20 @@ void MyMesh::onPeerDataRecv(mesh::Packet *packet, uint8_t type, int sender_idx, 
 }
 
 void MyMesh::onGroupDataRecv(mesh::Packet *packet, uint8_t type, const mesh::GroupChannel &channel, uint8_t *data, size_t len) {
-  if (type != PAYLOAD_TYPE_GRP_TXT || len <= 5) {
-    return;
-  }
-  if ((data[4] >> 2) != TXT_TYPE_PLAIN) {
-    return;
-  }
-  if (memcmp(channel.hash, responder_channel.hash, sizeof(channel.hash)) != 0) {
-    return;
-  }
-
-  uint8_t text_len = min((size_t)(MAX_PACKET_PAYLOAD - 1), len) - 5;
-  char text[MAX_PACKET_PAYLOAD];
-  memcpy(text, &data[5], text_len);
-  text[text_len] = 0;
-
-  while (text_len > 0 && (text[text_len - 1] == ' ' || text[text_len - 1] == '\r' || text[text_len - 1] == '\n' || text[text_len - 1] == '\t')) {
-    text[--text_len] = 0;
-  }
-
-  char *command = text;
-  while (*command == ' ' || *command == '\t') {
-    command++;
-  }
-
-  if (*command != '.') {
-    char *separator = strchr(command, ':');
-    if (separator != NULL) {
-      command = separator + 1;
-      while (*command == ' ' || *command == '\t') {
-        command++;
+  RpgGroupProtocol::Result rpg_result = RpgGroupProtocol::handleInbound(
+      packet, type, channel, rpg_channel, data, len, self_id, rtc_clock.getCurrentTime(), millis(),
+      *getRNG(), rpg_group_limiter, rpg_world_state, rpg_remote_state, _prefs.node_name);
+  if (rpg_result.handled) {
+    if (rpg_result.should_send_response) {
+      mesh::Packet* resp = createRpgGroupPacket(rpg_result.response, rpg_result.response_len);
+      if (resp) {
+        sendFlood(resp, rpg_result.response_delay_ms, packet->getPathHashSize());
       }
     }
-  }
-
-  MESH_DEBUG_PRINTLN("Group text on %s: '%s' -> command='%s'", AUTO_RESPONDER_CHANNEL, text, command);
-
-  bool is_pingw = strcmp(command, AUTO_RESPONDER_COMMAND) == 0;
-  bool is_pingw2 = strcmp(command, AUTO_RESPONDER_COMMAND2) == 0;
-  if (!is_pingw && !is_pingw2) {
     return;
   }
 
-  char reply[96];
-  uint8_t hops = packet->isRouteFlood() ? packet->getPathHashCount() : 0;
-  if (is_pingw2) {
-    formatPathReply(reply, sizeof(reply), packet->path, packet->path_len);
-  } else {
-    snprintf(reply, sizeof(reply), "%u hops", (unsigned int)hops);
-  }
-  MESH_DEBUG_PRINTLN("Auto-responder matched %s on %s, hops=%d", command, AUTO_RESPONDER_CHANNEL, (int)hops);
-
-  uint8_t payload[MAX_PACKET_PAYLOAD];
-  uint32_t now = getRTCClock()->getCurrentTimeUnique();
-  memcpy(payload, &now, 4);
-  payload[4] = 0;  // TXT_TYPE_PLAIN
-
-  snprintf((char *)&payload[5], sizeof(payload) - 5, "%s: %s", _prefs.node_name, reply);
-  size_t reply_len = strlen((char *)&payload[5]);
-
-  mesh::Packet *response = createGroupDatagram(PAYLOAD_TYPE_GRP_TXT, responder_channel, payload, 5 + reply_len);
-  if (response) {
-    sendFlood(response, AUTO_RESPONDER_REPLY_DELAY, _prefs.path_hash_mode + 1);
-  }
+  handleAutoResponderGroupText(packet, type, channel, data, len);
 }
 
 bool MyMesh::onPeerPathRecv(mesh::Packet *packet, int sender_idx, const uint8_t *secret, uint8_t *path,
@@ -1024,6 +1247,69 @@ void MyMesh::onControlDataRecv(mesh::Packet* packet) {
   }
 }
 
+void MyMesh::onRawDataRecv(mesh::Packet* packet) {
+  if (packet->payload_len < 2 + PUB_KEY_SIZE + CIPHER_MAC_SIZE) {
+    return;
+  }
+  if (packet->payload[0] != RPG_RAW_MAGIC) {
+    return;
+  }
+
+  uint8_t type = packet->payload[1];
+  mesh::Identity sender(&packet->payload[2]);
+  uint8_t secret[PUB_KEY_SIZE];
+  self_id.calcSharedSecret(secret, sender);
+
+  uint8_t data[MAX_PACKET_PAYLOAD];
+  int len = mesh::Utils::MACThenDecrypt(secret, data, &packet->payload[2 + PUB_KEY_SIZE],
+                                        packet->payload_len - (2 + PUB_KEY_SIZE));
+  if (len <= 0) {
+    return;
+  }
+
+  char temp[160];
+
+  if (len < 4) {
+    return;
+  }
+
+  uint32_t convoy_id;
+  memcpy(&convoy_id, data, 4);
+  if (!rpg_convoy_state.hasActiveLocal() || convoy_id != rpg_convoy_state.getLocalConvoyId()) {
+    if (rpg_convoy_state.shouldIgnoreCompleted(convoy_id)) {
+      return;
+    }
+    return;
+  }
+  if (memcmp(rpg_convoy_state.getLocalTargetPubKey(), sender.pub_key, PUB_KEY_SIZE) != 0) {
+    return;
+  }
+
+  if (type == RPG_RAW_TYPE_CONVOY_ACK) {
+    if (rpg_convoy_state.markAcked(convoy_id, temp, sizeof(temp), millis())) {
+      MESH_DEBUG_PRINTLN("%s", temp);
+    }
+  } else if (type == RPG_RAW_TYPE_CONVOY_WAIT && len >= 6) {
+    uint16_t mins;
+    memcpy(&mins, &data[4], 2);
+    MESH_DEBUG_PRINTLN("rpg convoy: target says wait %u min", (unsigned int)mins);
+  } else if (type == RPG_RAW_TYPE_CONVOY_RESULT && len >= 14) {
+    uint16_t wood, ore, herbs, relics, gold;
+    memcpy(&wood, &data[4], 2);
+    memcpy(&ore, &data[6], 2);
+    memcpy(&herbs, &data[8], 2);
+    memcpy(&relics, &data[10], 2);
+    memcpy(&gold, &data[12], 2);
+    if (rpg_game.applyConvoyLoot(rpg_convoy_state.getLocalPlayerKey(), wood, ore, herbs, relics, gold,
+                                 temp, sizeof(temp))) {
+      rpg_convoy_state.completeLocal(convoy_id);
+      MESH_DEBUG_PRINTLN("%s", temp);
+    }
+  } else if (type == RPG_RAW_TYPE_CONVOY_ERROR && len >= 5) {
+    MESH_DEBUG_PRINTLN("rpg convoy: remote error=%u", (unsigned int)data[4]);
+  }
+}
+
 void MyMesh::sendNodeDiscoverReq() {
   uint8_t data[10];
   data[0] = CTL_TYPE_NODE_DISCOVER_REQ; // prefix_only=0
@@ -1040,6 +1326,116 @@ void MyMesh::sendNodeDiscoverReq() {
   }
 }
 
+bool MyMesh::handleRpgConvoyCommand(const uint8_t* player_id, size_t player_id_len, char* command, char* reply) {
+  const char* sub = command + 3;
+  while (*sub == ' ') {
+    sub++;
+  }
+  if (memcmp(sub, "convoy", 6) != 0 || (sub[6] != 0 && sub[6] != ' ')) {
+    return false;
+  }
+
+  sub += 6;
+  while (*sub == ' ') {
+    sub++;
+  }
+
+  if (*sub == 0 || strcmp(sub, "status") == 0) {
+    rpg_convoy_state.formatLocalStatus(reply, 160, millis());
+    return true;
+  }
+
+  if (memcmp(sub, "send ", 5) == 0) {
+    if (player_id == NULL || player_id_len == 0 || !rpg_game.hasPlayer(player_id, player_id_len)) {
+      strcpy(reply, "rpg convoy: use 'rpg create' first");
+      return true;
+    }
+    if (rpg_convoy_state.hasActiveLocal()) {
+      rpg_convoy_state.formatLocalStatus(reply, 160, millis());
+      return true;
+    }
+
+    const char* prefix = sub + 5;
+    while (*prefix == ' ') {
+      prefix++;
+    }
+    if (*prefix == 0) {
+      strcpy(reply, "rpg convoy: send <pubkeyprefix>");
+      return true;
+    }
+
+    mesh::Identity target;
+    char target_name[17];
+    if (!resolveRpgTargetByPrefix(prefix, target, target_name, sizeof(target_name))) {
+      strcpy(reply, "rpg convoy: node not known, use rpg probe or neighbors");
+      return true;
+    }
+    if (target.matches(self_id)) {
+      strcpy(reply, "rpg convoy: target must be remote");
+      return true;
+    }
+
+    uint32_t convoy_id;
+    getRNG()->random((uint8_t*)&convoy_id, sizeof(convoy_id));
+    if (convoy_id == 0) {
+      convoy_id = 1;
+    }
+
+    uint8_t player_key[8];
+    memset(player_key, 0, sizeof(player_key));
+    memcpy(player_key, player_id, min((size_t)8, player_id_len));
+
+    uint8_t data[32];
+    uint32_t now = getRTCClock()->getCurrentTimeUnique();
+    memcpy(data, &now, 4);
+    data[4] = ANON_REQ_TYPE_RPG;
+    data[5] = RPG_REQ_CONVOY_SEND;
+    memcpy(&data[6], &convoy_id, 4);
+    memcpy(&data[10], player_key, sizeof(player_key));
+
+    uint8_t secret[PUB_KEY_SIZE];
+    self_id.calcSharedSecret(secret, target);
+    mesh::Packet* pkt = createAnonDatagram(PAYLOAD_TYPE_ANON_REQ, self_id, target, secret, data, 18);
+    if (pkt == NULL) {
+      strcpy(reply, "rpg convoy: unable to create request");
+      return true;
+    }
+    rpg_convoy_state.beginLocal(convoy_id, player_id, player_id_len, target.pub_key, target_name, millis(), reply, 160);
+    sendFlood(pkt, (uint32_t)0, _prefs.path_hash_mode + 1);
+    return true;
+  }
+
+  if (strcmp(sub, "collect") == 0) {
+    if (!rpg_convoy_state.hasActiveLocal()) {
+      strcpy(reply, "rpg convoy: none");
+      return true;
+    }
+    uint32_t convoy_id = rpg_convoy_state.getLocalConvoyId();
+    uint8_t data[32];
+    uint32_t now = getRTCClock()->getCurrentTimeUnique();
+    memcpy(data, &now, 4);
+    data[4] = ANON_REQ_TYPE_RPG;
+    data[5] = RPG_REQ_CONVOY_COLLECT;
+    memcpy(&data[6], &convoy_id, 4);
+    memcpy(&data[10], rpg_convoy_state.getLocalPlayerKey(), 8);
+
+    mesh::Identity target(rpg_convoy_state.getLocalTargetPubKey());
+    uint8_t secret[PUB_KEY_SIZE];
+    self_id.calcSharedSecret(secret, target);
+    mesh::Packet* pkt = createAnonDatagram(PAYLOAD_TYPE_ANON_REQ, self_id, target, secret, data, 18);
+    if (pkt == NULL) {
+      strcpy(reply, "rpg convoy: unable to create collect request");
+      return true;
+    }
+    sendFlood(pkt, (uint32_t)0, _prefs.path_hash_mode + 1);
+    strcpy(reply, "rpg convoy: collect request sent");
+    return true;
+  }
+
+  strcpy(reply, "rpg convoy: send <pubkeyprefix>|collect|status");
+  return true;
+}
+
 MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondClock &ms, mesh::RNG &rng,
                mesh::RTCClock &rtc, mesh::MeshTables &tables)
     : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables),
@@ -1047,7 +1443,8 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
       _cli(board, rtc, sensors, region_map, acl, &_prefs, this),
       telemetry(MAX_PACKET_PAYLOAD - 4),
       discover_limiter(4, 120),  // max 4 every 2 minutes
-      anon_limiter(4, 180)   // max 4 every 3 minutes
+      anon_limiter(4, 180),   // max 4 every 3 minutes
+      rpg_group_limiter(4, 120)   // max 4 every 2 minutes
 #if defined(WITH_RS232_BRIDGE)
       , bridge(&_prefs, WITH_RS232_BRIDGE, _mgr, &rtc)
 #endif
@@ -1063,6 +1460,7 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
   _logging = false;
   region_load_active = false;
   active_cli_path_len = 0;
+  active_cli_player_id_len = 0;
 
 #if MAX_NEIGHBOURS
   memset(neighbours, 0, sizeof(neighbours));
@@ -1114,6 +1512,8 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
 
   pending_discover_tag = 0;
   pending_discover_until = 0;
+  deriveHashtagChannel(responder_channel, AUTO_RESPONDER_CHANNEL);
+  deriveHashtagChannel(rpg_channel, MCRPG_TECH_CHANNEL);
 
   memset(default_scope.key, 0, sizeof(default_scope.key));
   deriveHashtagChannel(responder_channel, AUTO_RESPONDER_CHANNEL);
@@ -1454,6 +1854,56 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
     }
   } else if (strcmp(command, "ping") == 0) {
     formatPathReply(reply, 160, active_cli_path, active_cli_path_len);
+  } else if (memcmp(command, "rpg", 3) == 0 && (command[3] == 0 || command[3] == ' ')) {
+    if (strcmp(command, "rpg detect") == 0 || strcmp(command, "rpg scan") == 0 || strcmp(command, "rpg discover") == 0) {
+      if (sendRpgDiscoverRequest(NULL, 0) > 0) {
+        strcpy(reply, "rpg: flood discovery sent");
+      } else {
+        strcpy(reply, "rpg: discovery send failed");
+      }
+      return;
+    }
+    if (memcmp(command, "rpg probe ", 10) == 0) {
+      const char* prefix = command + 10;
+      while (*prefix == ' ') {
+        prefix++;
+      }
+      if (*prefix == 0) {
+        strcpy(reply, "rpg: probe <pubkeyprefix>");
+        return;
+      }
+      uint8_t prefix_bytes[8];
+      uint8_t prefix_len = 0;
+      if (!parseHexPrefixBytes(prefix, prefix_bytes, &prefix_len)) {
+        strcpy(reply, "rpg: probe wants even hex, 2..16 chars");
+        return;
+      }
+      if (sendRpgDiscoverRequest(prefix_bytes, prefix_len) > 0) {
+        snprintf(reply, 160, "rpg: targeted discovery sent for %s", prefix);
+      } else {
+        strcpy(reply, "rpg: probe send failed");
+      }
+      return;
+    }
+    if (strcmp(command, "rpg advert") == 0) {
+      if (sendRpgPresence() > 0) {
+        strcpy(reply, "rpg: presence advert sent");
+      } else {
+        strcpy(reply, "rpg: advert send failed");
+      }
+      return;
+    }
+    const uint8_t* player_id = active_cli_player_id_len > 0 ? active_cli_player_id : self_id.pub_key;
+    size_t player_id_len = active_cli_player_id_len > 0 ? active_cli_player_id_len : PUB_KEY_SIZE;
+    if (handleRpgConvoyCommand(player_id, player_id_len, command, reply)) {
+      return;
+    }
+    if (rpg_remote_state.handleCommand(command, reply, 160, rtc_clock.getCurrentTime())) {
+      return;
+    }
+    const char* known_name = active_cli_player_id_len > 0 ? NULL : _prefs.node_name;
+    rpg_game.handleCommand(player_id, player_id_len, millis(), *getRNG(), command, reply, 160, known_name,
+                           &rpg_world_state);
   } else if (memcmp(command, "stats", 5) == 0 && (command[5] == 0 || command[5] == ' ')) {
     const char* parts[2];
     int n = mesh::Utils::parseTextParts(command, parts, 2, ' ');
@@ -1500,7 +1950,7 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
     uint32_t idx = getRNG()->nextInt(0, sizeof(answers) / sizeof(answers[0]));
     strcpy(reply, answers[idx]);
   } else if (strcmp(command, "help") == 0 || strcmp(command, "help guest") == 0) {
-    strcpy(reply, "guest: help, ping, stats rx|tx|rxtx, roll [N], coin, 8ball [question]");
+    strcpy(reply, "guest: help, ping, stats rx|tx|rxtx, rpg <cmd>, roll [N], coin, 8ball [question]");
   } else{
     _cli.handleCommand(sender_timestamp, command, reply);  // common CLI commands
   }
