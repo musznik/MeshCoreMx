@@ -7,7 +7,7 @@ namespace rpg {
 static const uint8_t PLAYER_KEY_SIZE = 8;
 static const uint8_t PLAYER_NAME_SIZE = 16;
 static const uint8_t MAX_PLAYERS = 12;
-static const uint32_t ACTION_COOLDOWN_MS = 8000;
+static const uint32_t ACTION_COOLDOWN_MS = 4000;
 
 enum Location : uint8_t {
   LOCATION_CAMP = 0,

@@ -8,3 +8,7 @@
 #include "rpg/RpgWorldStateImpl.ipp"
 #include "rpg/RpgConvoyState.h"
 #include "rpg/RpgConvoyStateImpl.ipp"
+#include "rpg/RpgConvoyPersistence.h"
+#include "rpg/RpgConvoyPersistenceImpl.ipp"
+#include "rpg/RpgConvoyProtocol.h"
+#include "rpg/RpgConvoyProtocolImpl.ipp"
