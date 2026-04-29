@@ -35,7 +35,9 @@
 #include <helpers/RegionMap.h>
 #include "RateLimiter.h"
 #include "TrafficHistory.h"
+#include "rpg/RpgConvoyProtocol.h"
 #include "rpg/RpgConvoyState.h"
+#include "rpg/RpgConvoyPersistence.h"
 #include "rpg/RpgGame.h"
 #include "rpg/RpgRemoteState.h"
 #include "rpg/RpgWorldState.h"
@@ -85,7 +87,7 @@ struct NeighbourInfo {
 
 #define PACKET_LOG_FILE  "/packet_log"
 
-class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
+class MyMesh : public mesh::Mesh, public CommonCLICallbacks, public RpgConvoyProtocolHost {
   FILESYSTEM* _fs;
   uint32_t last_millis;
   uint64_t uptime_millis;
@@ -146,13 +148,15 @@ class MyMesh : public mesh::Mesh, public CommonCLICallbacks {
   mesh::Packet* createRpgRawReply(const mesh::Identity& dest, const uint8_t* secret, uint8_t type,
                                   const uint8_t* body, size_t body_len);
   mesh::Packet* createRpgGroupPacket(const uint8_t* data, size_t len);
+  mesh::Packet* createRpgAnonRequest(const mesh::Identity& target, const uint8_t* data, size_t len) override;
   bool handleAutoResponderGroupText(mesh::Packet* packet, uint8_t type, const mesh::GroupChannel& channel,
                                     const uint8_t* data, size_t len);
   int sendRpgPresence();
   bool sendDirectBackToFloodSender(mesh::Packet* packet, mesh::Packet* reply);
-  bool handleRpgConvoyCommand(const uint8_t* player_id, size_t player_id_len, char* command, char* reply);
   bool resolveRpgTargetByPrefix(const char* prefix, mesh::Identity& id, char* name, size_t name_size) const;
   int sendRpgDiscoverRequest(const uint8_t* target_prefix, uint8_t target_prefix_len);
+  void sendRpgFlood(mesh::Packet* packet, uint32_t delay_ms) override;
+  void debugPrintRpg(const char* text) override;
 
   File openAppend(const char* fname);
   bool isLooped(const mesh::Packet* packet, const uint8_t max_counters[]);
@@ -207,6 +211,12 @@ protected:
 
 public:
   MyMesh(mesh::MainBoard& board, mesh::Radio& radio, mesh::MillisecondClock& ms, mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables);
+
+  const mesh::LocalIdentity& getRpgSelfId() const override { return self_id; }
+  uint32_t getRpgNowMs() const override { return millis(); }
+  uint32_t getRpgNowS() const override { return rtc_clock.getCurrentTime(); }
+  uint32_t getRpgUniqueTime() const override { return getRTCClock()->getCurrentTimeUnique(); }
+  mesh::RNG& getRpgRng() override { return *getRNG(); }
 
   void begin(FILESYSTEM* fs);
   void sendNodeDiscoverReq();

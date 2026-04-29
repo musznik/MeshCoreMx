@@ -25,13 +25,13 @@ int RpgConvoyState::findRemote(uint32_t convoy_id, const uint8_t origin_pub_key[
 
 int RpgConvoyState::allocateRemoteSlot() {
   int oldest_idx = 0;
-  uint32_t oldest_ms = 0xFFFFFFFFUL;
+  uint32_t oldest_s = 0xFFFFFFFFUL;
   for (uint8_t i = 0; i < MAX_REMOTE_CONVOYS; i++) {
     if (!_remote[i].used) {
       return i;
     }
-    if (_remote[i].arrived_at_ms < oldest_ms) {
-      oldest_ms = _remote[i].arrived_at_ms;
+    if (_remote[i].arrived_at_s < oldest_s) {
+      oldest_s = _remote[i].arrived_at_s;
       oldest_idx = i;
     }
   }
@@ -120,7 +120,7 @@ void RpgConvoyState::clearLocal() {
 }
 
 bool RpgConvoyState::upsertRemote(uint32_t convoy_id, const uint8_t origin_pub_key[PUB_KEY_SIZE],
-                                  const uint8_t* player_id, size_t player_id_len, uint32_t now_ms) {
+                                  const uint8_t* player_id, size_t player_id_len, uint32_t now_s) {
   int idx = findRemote(convoy_id, origin_pub_key);
   if (idx < 0) {
     idx = allocateRemoteSlot();
@@ -130,8 +130,8 @@ bool RpgConvoyState::upsertRemote(uint32_t convoy_id, const uint8_t origin_pub_k
   _remote[idx].convoy_id = convoy_id;
   memcpy(_remote[idx].origin_pub_key, origin_pub_key, PUB_KEY_SIZE);
   copyPlayerKey(_remote[idx].player_key, player_id, player_id_len);
-  if (_remote[idx].arrived_at_ms == 0) {
-    _remote[idx].arrived_at_ms = now_ms;
+  if (_remote[idx].arrived_at_s == 0) {
+    _remote[idx].arrived_at_s = now_s;
   }
   return true;
 }
@@ -159,4 +159,38 @@ bool RpgConvoyState::finalizeRemoteResult(uint32_t convoy_id, const uint8_t orig
   _remote[idx].relics = relics;
   _remote[idx].gold = gold;
   return true;
+}
+
+void RpgConvoyState::exportRemoteState(PersistedRemoteConvoy out[MAX_REMOTE_CONVOYS]) const {
+  for (uint8_t i = 0; i < MAX_REMOTE_CONVOYS; i++) {
+    memset(&out[i], 0, sizeof(out[i]));
+    out[i].used = _remote[i].used ? 1 : 0;
+    out[i].convoy_id = _remote[i].convoy_id;
+    memcpy(out[i].origin_pub_key, _remote[i].origin_pub_key, PUB_KEY_SIZE);
+    memcpy(out[i].player_key, _remote[i].player_key, sizeof(out[i].player_key));
+    out[i].arrived_at_s = _remote[i].arrived_at_s;
+    out[i].result_finalized = _remote[i].result_finalized ? 1 : 0;
+    out[i].wood = _remote[i].wood;
+    out[i].ore = _remote[i].ore;
+    out[i].herbs = _remote[i].herbs;
+    out[i].relics = _remote[i].relics;
+    out[i].gold = _remote[i].gold;
+  }
+}
+
+void RpgConvoyState::importRemoteState(const PersistedRemoteConvoy in[MAX_REMOTE_CONVOYS]) {
+  memset(_remote, 0, sizeof(_remote));
+  for (uint8_t i = 0; i < MAX_REMOTE_CONVOYS; i++) {
+    _remote[i].used = in[i].used != 0;
+    _remote[i].convoy_id = in[i].convoy_id;
+    memcpy(_remote[i].origin_pub_key, in[i].origin_pub_key, PUB_KEY_SIZE);
+    memcpy(_remote[i].player_key, in[i].player_key, sizeof(_remote[i].player_key));
+    _remote[i].arrived_at_s = in[i].arrived_at_s;
+    _remote[i].result_finalized = in[i].result_finalized != 0;
+    _remote[i].wood = in[i].wood;
+    _remote[i].ore = in[i].ore;
+    _remote[i].herbs = in[i].herbs;
+    _remote[i].relics = in[i].relics;
+    _remote[i].gold = in[i].gold;
+  }
 }
