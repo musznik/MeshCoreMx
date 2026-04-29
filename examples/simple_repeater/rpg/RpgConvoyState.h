@@ -7,6 +7,8 @@ class RpgConvoyState {
 public:
   static const uint8_t MAX_REMOTE_CONVOYS = 6;
   static const uint32_t CONVOY_STAY_MS = 5UL * 60UL * 1000UL;
+  static const uint32_t CONVOY_STAY_SECS = 5UL * 60UL;
+  static const uint8_t PERSIST_VERSION = 1;
 
   enum LocalState : uint8_t {
     LOCAL_IDLE = 0,
@@ -29,7 +31,7 @@ public:
     uint32_t convoy_id;
     uint8_t origin_pub_key[PUB_KEY_SIZE];
     uint8_t player_key[8];
-    uint32_t arrived_at_ms;
+    uint32_t arrived_at_s;
     bool result_finalized;
     uint16_t wood;
     uint16_t ore;
@@ -37,6 +39,20 @@ public:
     uint16_t relics;
     uint16_t gold;
   };
+
+  struct PersistedRemoteConvoy {
+    uint8_t used;
+    uint32_t convoy_id;
+    uint8_t origin_pub_key[PUB_KEY_SIZE];
+    uint8_t player_key[8];
+    uint32_t arrived_at_s;
+    uint8_t result_finalized;
+    uint16_t wood;
+    uint16_t ore;
+    uint16_t herbs;
+    uint16_t relics;
+    uint16_t gold;
+  } __attribute__((packed));
 
 private:
   LocalConvoy _local;
@@ -65,8 +81,10 @@ public:
   void clearLocal();
 
   bool upsertRemote(uint32_t convoy_id, const uint8_t origin_pub_key[PUB_KEY_SIZE],
-                    const uint8_t* player_id, size_t player_id_len, uint32_t now_ms);
+                    const uint8_t* player_id, size_t player_id_len, uint32_t now_s);
   bool getRemote(uint32_t convoy_id, const uint8_t origin_pub_key[PUB_KEY_SIZE], RemoteConvoy& out) const;
   bool finalizeRemoteResult(uint32_t convoy_id, const uint8_t origin_pub_key[PUB_KEY_SIZE],
                             uint16_t wood, uint16_t ore, uint16_t herbs, uint16_t relics, uint16_t gold);
+  void exportRemoteState(PersistedRemoteConvoy out[MAX_REMOTE_CONVOYS]) const;
+  void importRemoteState(const PersistedRemoteConvoy in[MAX_REMOTE_CONVOYS]);
 };

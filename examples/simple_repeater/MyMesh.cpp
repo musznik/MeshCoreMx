@@ -57,8 +57,6 @@
 #define ANON_REQ_TYPE_REGIONS      0x01
 #define ANON_REQ_TYPE_OWNER        0x02
 #define ANON_REQ_TYPE_BASIC        0x03   // just remote clock
-#define ANON_REQ_TYPE_RPG          0x04
-
 #define CLI_REPLY_DELAY_MILLIS      600
 
 #define LAZY_CONTACTS_WRITE_DELAY    5000
@@ -67,14 +65,6 @@
 #define AUTO_RESPONDER_COMMAND2     ".wping3"
 #define AUTO_RESPONDER_REPLY_DELAY  250
 #define MCRPG_TECH_CHANNEL         "#mcrpg-tech"
-
-#define RPG_RAW_MAGIC              0xA7
-#define RPG_RAW_TYPE_CONVOY_ACK    0x01
-#define RPG_RAW_TYPE_CONVOY_WAIT   0x02
-#define RPG_RAW_TYPE_CONVOY_RESULT 0x03
-#define RPG_RAW_TYPE_CONVOY_ERROR  0x04
-#define RPG_REQ_CONVOY_SEND        0x01
-#define RPG_REQ_CONVOY_COLLECT     0x02
 
 static void deriveHashtagChannel(mesh::GroupChannel &channel, const char *name) {
   memset(&channel, 0, sizeof(channel));
@@ -544,7 +534,7 @@ mesh::Packet *MyMesh::createRpgRawReply(const mesh::Identity& dest, const uint8_
   if (body_len + 2 + PUB_KEY_SIZE + CIPHER_MAC_SIZE + CIPHER_BLOCK_SIZE > sizeof(payload)) {
     return NULL;
   }
-  payload[0] = RPG_RAW_MAGIC;
+  payload[0] = RpgConvoyProtocol::RAW_MAGIC;
   payload[1] = type;
   memcpy(&payload[2], self_id.pub_key, PUB_KEY_SIZE);
   int enc_len = mesh::Utils::encryptThenMAC(secret, &payload[2 + PUB_KEY_SIZE], body, body_len);
@@ -553,6 +543,12 @@ mesh::Packet *MyMesh::createRpgRawReply(const mesh::Identity& dest, const uint8_
 
 mesh::Packet *MyMesh::createRpgGroupPacket(const uint8_t* data, size_t len) {
   return createGroupDatagram(PAYLOAD_TYPE_GRP_DATA, rpg_channel, data, len);
+}
+
+mesh::Packet *MyMesh::createRpgAnonRequest(const mesh::Identity& target, const uint8_t* data, size_t len) {
+  uint8_t secret[PUB_KEY_SIZE];
+  self_id.calcSharedSecret(secret, target);
+  return createAnonDatagram(PAYLOAD_TYPE_ANON_REQ, self_id, target, secret, data, len);
 }
 
 bool MyMesh::handleAutoResponderGroupText(mesh::Packet* packet, uint8_t type, const mesh::GroupChannel& channel,
@@ -633,6 +629,14 @@ int MyMesh::sendRpgPresence() {
   }
   sendFlood(pkt, (uint32_t)0, _prefs.path_hash_mode + 1);
   return 1;
+}
+
+void MyMesh::sendRpgFlood(mesh::Packet* packet, uint32_t delay_ms) {
+  sendFlood(packet, delay_ms, _prefs.path_hash_mode + 1);
+}
+
+void MyMesh::debugPrintRpg(const char* text) {
+  MESH_DEBUG_PRINTLN("%s", text);
 }
 
 bool MyMesh::sendDirectBackToFloodSender(mesh::Packet* packet, mesh::Packet* reply) {
@@ -891,65 +895,9 @@ void MyMesh::onAnonDataRecv(mesh::Packet *packet, const uint8_t *secret, const m
     reply_path_len = -1;
     if (data[4] == 0 || data[4] >= ' ') {   // is password, ie. a login request
       reply_len = handleLoginReq(sender, secret, timestamp, &data[4], packet->isRouteFlood());
-    } else if (data[4] == ANON_REQ_TYPE_RPG && packet->isRouteFlood() && len >= 6) {
-      uint8_t req_type = data[5];
-
-      if (len >= 18 && req_type == RPG_REQ_CONVOY_SEND) {
-        uint32_t convoy_id;
-        memcpy(&convoy_id, &data[6], 4);
-        const uint8_t* player_key = &data[10];
-        rpg_convoy_state.upsertRemote(convoy_id, sender.pub_key, player_key, 8, millis());
-        uint8_t body[4];
-        memcpy(body, &convoy_id, 4);
-        mesh::Packet* raw = createRpgRawReply(sender, secret, RPG_RAW_TYPE_CONVOY_ACK, body, sizeof(body));
-        if (raw) {
-          sendDirectBackToFloodSender(packet, raw);
-        }
-        return;
-      } else if (len >= 18 && req_type == RPG_REQ_CONVOY_COLLECT) {
-        uint32_t convoy_id;
-        memcpy(&convoy_id, &data[6], 4);
-        RpgConvoyState::RemoteConvoy remote;
-        uint8_t body[16];
-        memcpy(body, &convoy_id, 4);
-        if (!rpg_convoy_state.getRemote(convoy_id, sender.pub_key, remote)) {
-          body[4] = 1;
-          mesh::Packet* raw = createRpgRawReply(sender, secret, RPG_RAW_TYPE_CONVOY_ERROR, body, 5);
-          if (raw) {
-            sendDirectBackToFloodSender(packet, raw);
-          }
-        } else {
-          uint32_t elapsed = (uint32_t)(millis() - remote.arrived_at_ms);
-          if (elapsed < RpgConvoyState::CONVOY_STAY_MS) {
-            uint16_t mins = (uint16_t)((RpgConvoyState::CONVOY_STAY_MS - elapsed + 59999UL) / 60000UL);
-            memcpy(&body[4], &mins, 2);
-            mesh::Packet* raw = createRpgRawReply(sender, secret, RPG_RAW_TYPE_CONVOY_WAIT, body, 6);
-            if (raw) {
-              sendDirectBackToFloodSender(packet, raw);
-            }
-          } else {
-            if (!remote.result_finalized) {
-              uint16_t wood = rpg_world_state.takeWood((uint16_t)getRNG()->nextInt(1, 4), millis());
-              uint16_t ore = rpg_world_state.takeOre((uint16_t)getRNG()->nextInt(1, 4), millis());
-              uint16_t herbs = rpg_world_state.takeHerbs((uint16_t)getRNG()->nextInt(0, 2), millis());
-              uint16_t relics = rpg_world_state.takeRelics((uint16_t)getRNG()->nextInt(0, 2), millis());
-              uint16_t gold = rpg_world_state.takeGold((uint16_t)getRNG()->nextInt(2, 7), millis());
-              rpg_convoy_state.finalizeRemoteResult(convoy_id, sender.pub_key, wood, ore, herbs, relics, gold);
-              rpg_convoy_state.getRemote(convoy_id, sender.pub_key, remote);
-            }
-            memcpy(&body[4], &remote.wood, 2);
-            memcpy(&body[6], &remote.ore, 2);
-            memcpy(&body[8], &remote.herbs, 2);
-            memcpy(&body[10], &remote.relics, 2);
-            memcpy(&body[12], &remote.gold, 2);
-            mesh::Packet* raw = createRpgRawReply(sender, secret, RPG_RAW_TYPE_CONVOY_RESULT, body, 14);
-            if (raw) {
-              sendDirectBackToFloodSender(packet, raw);
-            }
-          }
-        }
-        return;
-      }
+    } else if (RpgConvoyProtocol::handleAnonRequest(*this, _fs, packet, secret, sender, data, len,
+                                                    rpg_convoy_state, rpg_world_state)) {
+      return;
     } else if (data[4] == ANON_REQ_TYPE_REGIONS && packet->isRouteDirect()) {
       reply_len = handleAnonRegionsReq(sender, timestamp, &data[5]);
     } else if (data[4] == ANON_REQ_TYPE_OWNER && packet->isRouteDirect()) {
@@ -1252,66 +1200,7 @@ void MyMesh::onControlDataRecv(mesh::Packet* packet) {
 }
 
 void MyMesh::onRawDataRecv(mesh::Packet* packet) {
-  if (packet->payload_len < 2 + PUB_KEY_SIZE + CIPHER_MAC_SIZE) {
-    return;
-  }
-  if (packet->payload[0] != RPG_RAW_MAGIC) {
-    return;
-  }
-
-  uint8_t type = packet->payload[1];
-  mesh::Identity sender(&packet->payload[2]);
-  uint8_t secret[PUB_KEY_SIZE];
-  self_id.calcSharedSecret(secret, sender);
-
-  uint8_t data[MAX_PACKET_PAYLOAD];
-  int len = mesh::Utils::MACThenDecrypt(secret, data, &packet->payload[2 + PUB_KEY_SIZE],
-                                        packet->payload_len - (2 + PUB_KEY_SIZE));
-  if (len <= 0) {
-    return;
-  }
-
-  char temp[160];
-
-  if (len < 4) {
-    return;
-  }
-
-  uint32_t convoy_id;
-  memcpy(&convoy_id, data, 4);
-  if (!rpg_convoy_state.hasActiveLocal() || convoy_id != rpg_convoy_state.getLocalConvoyId()) {
-    if (rpg_convoy_state.shouldIgnoreCompleted(convoy_id)) {
-      return;
-    }
-    return;
-  }
-  if (memcmp(rpg_convoy_state.getLocalTargetPubKey(), sender.pub_key, PUB_KEY_SIZE) != 0) {
-    return;
-  }
-
-  if (type == RPG_RAW_TYPE_CONVOY_ACK) {
-    if (rpg_convoy_state.markAcked(convoy_id, temp, sizeof(temp), millis())) {
-      MESH_DEBUG_PRINTLN("%s", temp);
-    }
-  } else if (type == RPG_RAW_TYPE_CONVOY_WAIT && len >= 6) {
-    uint16_t mins;
-    memcpy(&mins, &data[4], 2);
-    MESH_DEBUG_PRINTLN("rpg convoy: target says wait %u min", (unsigned int)mins);
-  } else if (type == RPG_RAW_TYPE_CONVOY_RESULT && len >= 14) {
-    uint16_t wood, ore, herbs, relics, gold;
-    memcpy(&wood, &data[4], 2);
-    memcpy(&ore, &data[6], 2);
-    memcpy(&herbs, &data[8], 2);
-    memcpy(&relics, &data[10], 2);
-    memcpy(&gold, &data[12], 2);
-    if (rpg_game.applyConvoyLoot(rpg_convoy_state.getLocalPlayerKey(), wood, ore, herbs, relics, gold,
-                                 temp, sizeof(temp))) {
-      rpg_convoy_state.completeLocal(convoy_id);
-      MESH_DEBUG_PRINTLN("%s", temp);
-    }
-  } else if (type == RPG_RAW_TYPE_CONVOY_ERROR && len >= 5) {
-    MESH_DEBUG_PRINTLN("rpg convoy: remote error=%u", (unsigned int)data[4]);
-  }
+  RpgConvoyProtocol::handleRawData(*this, packet, rpg_convoy_state, rpg_game);
 }
 
 void MyMesh::sendNodeDiscoverReq() {
@@ -1328,116 +1217,6 @@ void MyMesh::sendNodeDiscoverReq() {
   if (pkt) {
     sendZeroHop(pkt);
   }
-}
-
-bool MyMesh::handleRpgConvoyCommand(const uint8_t* player_id, size_t player_id_len, char* command, char* reply) {
-  const char* sub = command + 3;
-  while (*sub == ' ') {
-    sub++;
-  }
-  if (memcmp(sub, "convoy", 6) != 0 || (sub[6] != 0 && sub[6] != ' ')) {
-    return false;
-  }
-
-  sub += 6;
-  while (*sub == ' ') {
-    sub++;
-  }
-
-  if (*sub == 0 || strcmp(sub, "status") == 0) {
-    rpg_convoy_state.formatLocalStatus(reply, 160, millis());
-    return true;
-  }
-
-  if (memcmp(sub, "send ", 5) == 0) {
-    if (player_id == NULL || player_id_len == 0 || !rpg_game.hasPlayer(player_id, player_id_len)) {
-      strcpy(reply, "rpg convoy: use 'rpg create' first");
-      return true;
-    }
-    if (rpg_convoy_state.hasActiveLocal()) {
-      rpg_convoy_state.formatLocalStatus(reply, 160, millis());
-      return true;
-    }
-
-    const char* prefix = sub + 5;
-    while (*prefix == ' ') {
-      prefix++;
-    }
-    if (*prefix == 0) {
-      strcpy(reply, "rpg convoy: send <pubkeyprefix>");
-      return true;
-    }
-
-    mesh::Identity target;
-    char target_name[17];
-    if (!resolveRpgTargetByPrefix(prefix, target, target_name, sizeof(target_name))) {
-      strcpy(reply, "rpg convoy: node not known, use rpg probe or neighbors");
-      return true;
-    }
-    if (target.matches(self_id)) {
-      strcpy(reply, "rpg convoy: target must be remote");
-      return true;
-    }
-
-    uint32_t convoy_id;
-    getRNG()->random((uint8_t*)&convoy_id, sizeof(convoy_id));
-    if (convoy_id == 0) {
-      convoy_id = 1;
-    }
-
-    uint8_t player_key[8];
-    memset(player_key, 0, sizeof(player_key));
-    memcpy(player_key, player_id, min((size_t)8, player_id_len));
-
-    uint8_t data[32];
-    uint32_t now = getRTCClock()->getCurrentTimeUnique();
-    memcpy(data, &now, 4);
-    data[4] = ANON_REQ_TYPE_RPG;
-    data[5] = RPG_REQ_CONVOY_SEND;
-    memcpy(&data[6], &convoy_id, 4);
-    memcpy(&data[10], player_key, sizeof(player_key));
-
-    uint8_t secret[PUB_KEY_SIZE];
-    self_id.calcSharedSecret(secret, target);
-    mesh::Packet* pkt = createAnonDatagram(PAYLOAD_TYPE_ANON_REQ, self_id, target, secret, data, 18);
-    if (pkt == NULL) {
-      strcpy(reply, "rpg convoy: unable to create request");
-      return true;
-    }
-    rpg_convoy_state.beginLocal(convoy_id, player_id, player_id_len, target.pub_key, target_name, millis(), reply, 160);
-    sendFlood(pkt, (uint32_t)0, _prefs.path_hash_mode + 1);
-    return true;
-  }
-
-  if (strcmp(sub, "collect") == 0) {
-    if (!rpg_convoy_state.hasActiveLocal()) {
-      strcpy(reply, "rpg convoy: none");
-      return true;
-    }
-    uint32_t convoy_id = rpg_convoy_state.getLocalConvoyId();
-    uint8_t data[32];
-    uint32_t now = getRTCClock()->getCurrentTimeUnique();
-    memcpy(data, &now, 4);
-    data[4] = ANON_REQ_TYPE_RPG;
-    data[5] = RPG_REQ_CONVOY_COLLECT;
-    memcpy(&data[6], &convoy_id, 4);
-    memcpy(&data[10], rpg_convoy_state.getLocalPlayerKey(), 8);
-
-    mesh::Identity target(rpg_convoy_state.getLocalTargetPubKey());
-    uint8_t secret[PUB_KEY_SIZE];
-    self_id.calcSharedSecret(secret, target);
-    mesh::Packet* pkt = createAnonDatagram(PAYLOAD_TYPE_ANON_REQ, self_id, target, secret, data, 18);
-    if (pkt == NULL) {
-      strcpy(reply, "rpg convoy: unable to create collect request");
-      return true;
-    }
-    sendFlood(pkt, (uint32_t)0, _prefs.path_hash_mode + 1);
-    strcpy(reply, "rpg convoy: collect request sent");
-    return true;
-  }
-
-  strcpy(reply, "rpg convoy: send <pubkeyprefix>|collect|status");
-  return true;
 }
 
 MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondClock &ms, mesh::RNG &rng,
@@ -1532,6 +1311,9 @@ void MyMesh::begin(FILESYSTEM *fs) {
   acl.load(_fs, self_id);
   // TODO: key_store.begin();
   region_map.load(_fs);
+  if (!RpgConvoyPersistence::load(_fs, rpg_convoy_state) && RpgConvoyPersistence::exists(_fs)) {
+    MESH_DEBUG_PRINTLN("rpg convoy: persisted state invalid, ignoring");
+  }
 
   // establish default-scope
   {
@@ -1900,7 +1682,8 @@ void MyMesh::handleCommand(uint32_t sender_timestamp, char *command, char *reply
     }
     const uint8_t* player_id = active_cli_player_id_len > 0 ? active_cli_player_id : self_id.pub_key;
     size_t player_id_len = active_cli_player_id_len > 0 ? active_cli_player_id_len : PUB_KEY_SIZE;
-    if (handleRpgConvoyCommand(player_id, player_id_len, command, reply)) {
+    if (RpgConvoyProtocol::handleCommand(*this, player_id, player_id_len, command, reply, 160, rpg_game,
+                                         rpg_convoy_state)) {
       return;
     }
     if (rpg_remote_state.handleCommand(command, reply, 160, rtc_clock.getCurrentTime())) {
