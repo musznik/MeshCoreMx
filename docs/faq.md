@@ -300,9 +300,9 @@ This is a very low cost operation.  AGC reset is done by simply setting `state =
 **A:**
 
 **Background:**
-The orginal MeshCore protocol design uses the first byte of a repeater's public key to denote the repeater in a path.  And with 1 byte for each repeater in the path, MeshCore packets can travel as many as 64 hops.  
+The orginal MeshCore protocol design uses the first byte of a repeater's public key to denote the repeater in a path.  And with 1 byte for each repeater in the path, MeshCore packets can travel as many as 64 hops.
 
-However, with 1 byte, there are only 254 unique IDs (exclude 00 and FF which are reserved).  Many meshes group have multiple repeaters with the same first byte in their public keys. Packets continue to pass through repeaters and the mesh is not harmed in anyway.  It does make it harder for tools to analyze paths with duplicated repeater IDs.  
+However, with 1 byte, there are only 254 unique IDs (exclude 00 and FF which are reserved).  Many meshes group have multiple repeaters with the same first byte in their public keys. Packets continue to pass through repeaters and the mesh is not harmed in anyway.  It does make it harder for tools to analyze paths with duplicated repeater IDs.
 
 Firmware version 1.14 and newer introduces the ability for repeaters to advert with 1-, 2-, or 3-byte adverts.  Companions can also send out channel and direct messages 1-, 2-, or 3-byte path.  Adverts and messages sent in 1-byte path is compatible with repeater firmware older or newer than 1.14.  They will travel up to 64 hops.  2-byte adverts and messages will travel up to 32 hops.  3-byte adverts and messages will travel up to 21 hops.
 
