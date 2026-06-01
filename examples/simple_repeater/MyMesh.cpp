@@ -61,8 +61,8 @@
 
 #define LAZY_CONTACTS_WRITE_DELAY    5000
 #define AUTO_RESPONDER_CHANNEL      "#test"
-#define AUTO_RESPONDER_COMMAND      ".wping"
-#define AUTO_RESPONDER_COMMAND2     ".wping2"
+#define AUTO_RESPONDER_COMMAND      ".zping"
+#define AUTO_RESPONDER_COMMAND2     ".zping1"
 #define AUTO_RESPONDER_REPLY_DELAY  250
 #define MCRPG_TECH_CHANNEL         "#mcrpg-tech"
 
