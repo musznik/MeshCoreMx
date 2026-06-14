@@ -61,8 +61,8 @@
 
 #define LAZY_CONTACTS_WRITE_DELAY    5000
 #define AUTO_RESPONDER_CHANNEL      "#test"
-#define AUTO_RESPONDER_COMMAND      ".wping"
-#define AUTO_RESPONDER_COMMAND2     ".wping3"
+#define AUTO_RESPONDER_COMMAND      ".zping"
+#define AUTO_RESPONDER_COMMAND2     ".zping1"
 #define AUTO_RESPONDER_REPLY_DELAY  250
 #define MCRPG_TECH_CHANNEL         "#mcrpg-tech"
 
@@ -981,7 +981,6 @@ void MyMesh::onAdvertRecv(mesh::Packet *packet, const mesh::Identity &id, uint32
 
   // if this a zero hop advert (and not via 'Share'), add it to neighbours
   if (packet->getPathHashCount() == 0 && !isShare(packet)) {
-    AdvertDataParser parser(app_data, app_data_len);
     if (parser.isValid() && parser.getType() == ADV_TYPE_REPEATER) { // just keep neigbouring Repeaters
       putNeighbour(id, timestamp, packet->getSNR());
     }
@@ -1302,7 +1301,6 @@ MyMesh::MyMesh(mesh::MainBoard &board, mesh::Radio &radio, mesh::MillisecondCloc
   deriveHashtagChannel(responder_channel, AUTO_RESPONDER_CHANNEL);
   deriveHashtagChannel(rpg_channel, MCRPG_TECH_CHANNEL);
   memset(default_scope.key, 0, sizeof(default_scope.key));
-  deriveHashtagChannel(responder_channel, AUTO_RESPONDER_CHANNEL);
 }
 
 void MyMesh::begin(FILESYSTEM *fs) {
