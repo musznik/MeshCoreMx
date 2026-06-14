@@ -731,9 +731,9 @@ SensorMesh::SensorMesh(mesh::MainBoard& board, mesh::Radio& radio, mesh::Millise
   _prefs.gps_enabled = 0;
   _prefs.gps_interval = 0;
   _prefs.advert_loc_policy = ADVERT_LOC_PREFS;
+  _prefs.radio_fem_rxgain = 1;
 
   memset(default_scope.key, 0, sizeof(default_scope.key));
-  _prefs.radio_fem_rxgain = 1;
 }
 
 void SensorMesh::begin(FILESYSTEM* fs) {
