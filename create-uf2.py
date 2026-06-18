@@ -2,30 +2,26 @@
 
 # Adds PlatformIO post-processing to convert hex files to uf2 files
 
-import os
+import sys
+
+if __name__ == "__main__":
+    print("This script is a PlatformIO extra script and should be run by PlatformIO, not directly.")
+    print("Use: platformio run -e <env> or platformio run -e <env> -t create_uf2")
+    sys.exit(1)
 
 Import("env")
 
-firmware_hex = "${BUILD_DIR}/${PROGNAME}.hex"
-uf2_file = os.environ.get("UF2_FILE_PATH", "${BUILD_DIR}/${PROGNAME}.uf2")
+uf2_cmd = " ".join(
+    [
+        '"$PYTHONEXE"',
+        '"$PROJECT_DIR/bin/uf2conv/uf2conv.py"',
+        '-f', '0xADA52840',
+        '-c', '"$BUILD_DIR/${PROGNAME}.hex"',
+        '-o', '"$BUILD_DIR/${PROGNAME}.uf2"',
+    ]
+)
 
-def create_uf2_action(source, target, env):
-    uf2_cmd = " ".join(
-        [
-            '"$PYTHONEXE"',
-            '"$PROJECT_DIR/bin/uf2conv/uf2conv.py"',
-            '-f', '0xADA52840',
-            '-c', firmware_hex,
-            '-o', uf2_file,
-        ]
-    )
-    env.Execute(uf2_cmd)
-
-env.AddCustomTarget(
-    name="create_uf2",
-    dependencies=firmware_hex,
-    actions=create_uf2_action,
-    title="Create UF2 file",
-    description="Use uf2conv to convert hex binary into uf2",
-    always_build=True,
+env.AddPostAction(
+    "$BUILD_DIR/${PROGNAME}.hex",
+    env.VerboseAction(uf2_cmd, "Building $BUILD_DIR/${PROGNAME}.uf2")
 )
